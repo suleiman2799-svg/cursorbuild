@@ -16,7 +16,7 @@ export class CursorBuildEngine {
  /** Attach a visual cursor layer. Coordinates are container-relative CSS pixels. */
  mountCursors(container: HTMLElement, options: CursorRendererOptions = {}): CursorRenderer {
   if (this.destroyed) throw new Error("CursorBuildEngine has been destroyed.");
-  const renderer = new CursorRenderer(this.cursors, container, options);
+  const renderer = new CursorRenderer(this.cursors, container, { ...options, respectReducedMotion: options.respectReducedMotion ?? this.config.respectReducedMotion });
   this.cursorRenderers.add(renderer);
   return renderer;
  }
