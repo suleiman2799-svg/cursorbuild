@@ -473,7 +473,10 @@ describe("CursorRenderer element resizing simulation", () => {
       resizeTween[1].onUpdate();
       const dx = expectedX === 0 ? 0 : expectedX;
       const dy = expectedY === 0 ? 0 : expectedY;
-      expect(target.style.translate).toBe(`calc(12px + ${dx}px) calc(4px + ${dy}px)`);
+      const expectedTranslate = dx === 0 && dy === 0
+        ? "12px 4px"
+        : `calc(12px + ${dx}px) calc(4px + ${dy}px)`;
+      expect(target.style.translate).toBe(expectedTranslate);
       expect(target.style.transform).toBe("rotate(4deg)");
       renderer.stopResize("a");
       expect(target.style.translate).toBe("12px 4px");
@@ -518,7 +521,10 @@ describe("CursorRenderer element resizing simulation", () => {
 
   it("restores the resize target when the same cursor starts text insertion", () => {
     const { host, renderer } = setup(["a"]);
-    const input = addInput(host);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = "Existing";
+    host.append(input);
     input.style.width = "100px";
     input.style.height = "80px";
     input.style.translate = "12px 4px";
