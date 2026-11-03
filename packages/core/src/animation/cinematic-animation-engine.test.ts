@@ -146,6 +146,7 @@ describe("CinematicAnimationEngine", () => {
     listener?.({ matches: true } as MediaQueryListEvent);
     expect(gsapState.set).toHaveBeenCalledWith([target], expect.objectContaining({ opacity: 1 }));
     expect(gsapState.timelines[0].kill).toHaveBeenCalledOnce();
+    engine.destroy();
     expect(remove).toHaveBeenCalledWith("change", expect.any(Function));
     window.matchMedia = original;
   });
