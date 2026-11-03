@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => {
     to: vi.fn()
   };
   const triggers: Array<{ progress: number; kill: ReturnType<typeof vi.fn>; refresh: ReturnType<typeof vi.fn> }> = [];
-  const create = vi.fn(() => {
+  const create = vi.fn((_vars: unknown) => {
     const trigger = { progress: 0, kill: vi.fn(), refresh: vi.fn() };
     triggers.push(trigger);
     return trigger;
@@ -40,7 +40,7 @@ describe("ScrollConstructionEngine", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.triggers.length = 0;
-    mocks.create.mockImplementation(() => {
+    mocks.create.mockImplementation((_vars: unknown) => {
       const trigger = { progress: 0, kill: vi.fn(), refresh: vi.fn() };
       mocks.triggers.push(trigger);
       return trigger;
