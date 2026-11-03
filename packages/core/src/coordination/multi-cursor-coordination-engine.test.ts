@@ -77,12 +77,17 @@ describe("MultiCursorCoordinationEngine", () => {
   it("cancels the entire group and propagates abort signals", async () => {
     engine = new MultiCursorCoordinationEngine();
     let observed = false;
-    const track = engine.createTimeline("maya", [{ id: "wait", run: ({ signal }) => new Promise<void>((resolve) => {
-      signal.addEventListener("abort", () => { observed = true; resolve(); }, { once: true });
-    }) }]);
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    const track = engine.createTimeline("maya", [{ id: "wait", run: ({ signal }) => {
+      markStarted();
+      return new Promise<void>((resolve) => {
+        signal.addEventListener("abort", () => { observed = true; resolve(); }, { once: true });
+      });
+    } }]);
     const group = engine.createGroup("cancel-all", [track]);
     const promise = group.run();
-    await Promise.resolve();
+    await started;
     group.cancel();
     await promise;
     expect(observed).toBe(true);
@@ -107,11 +112,19 @@ describe("MultiCursorCoordinationEngine", () => {
 
   it("propagates action failures and cancels siblings", async () => {
     engine = new MultiCursorCoordinationEngine();
-    const failed = engine.createTimeline("maya", [{ id: "fail", run: () => { throw new Error("boom"); } }]);
+    let markSiblingStarted!: () => void;
+    const siblingStarted = new Promise<void>((resolve) => { markSiblingStarted = resolve; });
+    const failed = engine.createTimeline("maya", [{ id: "fail", run: async () => {
+      await siblingStarted;
+      throw new Error("boom");
+    } }]);
     let aborted = false;
-    const sibling = engine.createTimeline("noah", [{ id: "sibling", run: ({ signal }) => new Promise<void>((resolve) => {
-      signal.addEventListener("abort", () => { aborted = true; resolve(); }, { once: true });
-    }) }]);
+    const sibling = engine.createTimeline("noah", [{ id: "sibling", run: ({ signal }) => {
+      markSiblingStarted();
+      return new Promise<void>((resolve) => {
+        signal.addEventListener("abort", () => { aborted = true; resolve(); }, { once: true });
+      });
+    } }]);
     const group = engine.createGroup("failure", [failed, sibling]);
     await expect(group.run()).rejects.toThrow("boom");
     expect(aborted).toBe(true);
