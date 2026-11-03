@@ -45,7 +45,7 @@ export default function App() {
  function removeCursor() {
   const guest = [...cursors].reverse().find((cursor) => cursor.id.startsWith("guest-"));
   if (guest) engine.cursors.remove(guest.id);
-  else { const lastStarter = [...starterCursors].reverse().find((cursor) => engine.cursors.get(cursor.id)); if (lastStarter) engine.cursors.remove(lastStarter.id); }
+
  }
  return <main className="shell">
   <nav><span className="mark">C</span><span>CURSORBUILD</span><span className="nav-tag">MULTI-CURSOR ENGINE · 0.2</span></nav>
@@ -60,7 +60,7 @@ export default function App() {
     <p>Three independent collaborators are exploring this interface. Watch their pointers move, pause and interact.</p>
     <div className="stage-card-row"><div className="stage-card"><span/><strong>Design system</strong></div><div className="stage-card"><span/><strong>Live prototype</strong></div><div className="stage-card"><span/><strong>Shared vision</strong></div></div>
    </div></div>
-   <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={cursors.length === 0}>− Remove cursor</button></div></div>
+   <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={!cursors.some((cursor) => cursor.id.startsWith("guest-"))}>− Remove cursor</button></div></div>
    <div className="cursor-legend">{cursors.map((cursor) => <span className="cursor-chip" key={cursor.id}><i style={{background:cursor.color}}/>{cursor.name}</span>)}</div>
   </section>
   <footer><span>FOUNDATION + CURSOR RENDERING · v0.2.0</span><span>Pointer overlay never intercepts page interaction.</span></footer>
