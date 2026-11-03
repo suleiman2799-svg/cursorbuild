@@ -72,7 +72,8 @@ export class MultiCursorCoordinator {
     let startGate: Promise<void> = Promise.resolve();
     let previous: Promise<void> | undefined;
 
-    for (const action of ordered) {
+    for (let index = 0; index < ordered.length; index += 1) {
+      const action = ordered[index]!;
       const dependencies = (action.dependsOn ?? []).map((id) => tasks.get(id)!);
       if (mode === "sequence" && previous) dependencies.push(previous);
       const task = Promise.all([...dependencies, startGate]).then(() =>
@@ -80,7 +81,7 @@ export class MultiCursorCoordinator {
       );
       tasks.set(action.id, task);
       if (mode === "sequence") previous = task;
-      if (delayBetween > 0) {
+      if (delayBetween > 0 && index < ordered.length - 1) {
         const gate = startGate;
         startGate = gate.then(() => this.wait(delayBetween, groupController.signal));
       }
