@@ -30,11 +30,11 @@ vi.mock("gsap/ScrollTrigger", () => ({
 import { ScrollConstructionEngine } from "./scroll-construction-engine.js";
 
 describe("ScrollConstructionEngine", () => {
-  const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
 
   afterEach(() => {
-    if (originalMatchMedia) Object.defineProperty(window, "matchMedia", originalMatchMedia);
-    else Reflect.deleteProperty(window, "matchMedia");
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow);
+    else Reflect.deleteProperty(globalThis, "window");
   });
 
   beforeEach(() => {
@@ -70,7 +70,7 @@ describe("ScrollConstructionEngine", () => {
 
   it("supports forward-only scenes without moving backwards", () => {
     const engine = new ScrollConstructionEngine();
-    engine.createScene("forward-only", { trigger: document.createElement("section"), reverse: false }, () => {});
+    engine.createScene("forward-only", { trigger: "#forward-only", reverse: false }, () => {});
     const vars = mocks.create.mock.calls[0]?.[0] as unknown as { onUpdate: (self: { progress: number }) => void };
     vars.onUpdate({ progress: 0.7 });
     vars.onUpdate({ progress: 0.2 });
@@ -84,7 +84,7 @@ describe("ScrollConstructionEngine", () => {
       addEventListener: vi.fn((_type: string, listener: (event: MediaQueryListEvent) => void) => { motionListener = listener; }),
       removeEventListener: vi.fn()
     };
-    Object.defineProperty(window, "matchMedia", { configurable: true, value: vi.fn(() => mediaQuery) });
+    vi.stubGlobal("window", { matchMedia: vi.fn(() => mediaQuery) });
     const engine = new ScrollConstructionEngine();
     const scene = engine.createScene("reduced", { trigger: "#reduced" }, () => {});
     expect(scene.progress).toBe(1);
