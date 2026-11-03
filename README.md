@@ -51,6 +51,10 @@ npm install
 npm run dev
 ~~~
 
+## Continuous integration
+
+GitHub Actions runs the unit tests, TypeScript checks, and production build on pushes to development branches and pull requests targeting main.
+
 ## Development commands
 ~~~bash
 npm run build
