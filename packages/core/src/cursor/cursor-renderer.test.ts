@@ -503,6 +503,45 @@ describe("CursorRenderer element resizing simulation", () => {
     expect(renderer.isResizing("b")).toBe(true);
   });
 
+  it("restores the resize target when the same cursor starts a drag", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    target.style.translate = "12px 4px";
+    renderer.resize("a", { target, to: { width: 180, height: 120 }, handle: "top-left" });
+    renderer.drag("a", { target, to: { x: 40, y: 50 } });
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(renderer.isDragging("a")).toBe(true);
+    expect(target.style.width).toBe("100px");
+    expect(target.style.height).toBe("80px");
+    expect(target.style.translate).toBe("12px 4px");
+  });
+
+  it("restores the resize target when the same cursor starts text insertion", () => {
+    const { host, renderer } = setup(["a"]);
+    const input = addInput(host);
+    input.style.width = "100px";
+    input.style.height = "80px";
+    input.style.translate = "12px 4px";
+    renderer.resize("a", { target: input, to: { width: 180, height: 120 }, handle: "top-left" });
+    renderer.typeText("a", { target: input, text: "Updated" });
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(renderer.isTyping("a")).toBe(true);
+    expect(input.style.width).toBe("100px");
+    expect(input.style.height).toBe("80px");
+    expect(input.style.translate).toBe("12px 4px");
+  });
+
+  it("restores the resize target when the same cursor starts a movement sequence", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    renderer.resize("a", { target, to: { width: 180, height: 120 }, handle: "top-left" });
+    renderer.moveSequence("a", [{ to: { x: 120, y: 90 }, duration: 0.2 }]);
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(target.style.width).toBe("100px");
+    expect(target.style.height).toBe("80px");
+    expect(target.style.translate).toBe("");
+  });
+
   it("cancels and restores dimensions when the target is removed", () => {
     const { host, renderer } = setup(["a"]);
     const target = addResizeTarget(host);
