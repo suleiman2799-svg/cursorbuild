@@ -1,0 +1,3 @@
+import { describe, expect, it } from "vitest";
+import { defaultConfig, resolveConfig } from "./config.js";
+describe("resolveConfig", () => { it("merges overrides with defaults", () => { expect(resolveConfig({debug:true})).toEqual({...defaultConfig,debug:true}); }); it("rejects invalid durations", () => { expect(() => resolveConfig({defaultDuration:-1})).toThrow(RangeError); expect(() => resolveConfig({defaultDuration:Number.NaN})).toThrow(RangeError); }); });
