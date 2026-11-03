@@ -34,3 +34,20 @@
 - [ ] API reference and integration examples
 - [ ] Accessibility and performance benchmarks
 - [ ] Release automation
+
+## Scroll-driven construction engine — implemented in PR #8
+- [x] Independent section-based construction scenes
+- [x] Configurable ScrollTrigger start/end boundaries and scrub smoothing
+- [x] Sequential and overlapping timeline steps
+- [x] Scroll progress callbacks and progress inspection
+- [x] Pause, resume, reverse-on-scroll-up, and per-scene cancellation
+- [x] Multiple independently managed scenes
+- [x] Reduced-motion immediate settlement and active-scene cleanup
+- [x] Engine lifecycle integration and responsive demo scene
+
+## Remaining milestones
+- [ ] Multi-cursor coordination engine
+- [ ] Advanced configurable visual effects
+- [ ] Responsive/performance profiling and browser-level validation
+- [ ] Reusable presets, complete developer docs, playground, and integration examples
+- [ ] Release readiness (no package publication without explicit approval)
