@@ -23,20 +23,23 @@ export class ScrollConstructionScene {
   private pausedState = false;
   private destroyed = false;
   private readonly triggerInstance: ScrollTriggerInstance;
+  private readonly allowReverse: boolean;
+  private readonly onProgress?: (progress: number) => void;
 
   constructor(
     readonly id: string,
     private readonly timeline: gsap.core.Timeline,
     options: ScrollConstructionSceneOptions
   ) {
-    const allowReverse = options.reverse ?? true;
+    this.allowReverse = options.reverse ?? true;
+    this.onProgress = options.onProgress;
     this.triggerInstance = ScrollTrigger.create({
       trigger: options.trigger,
       start: options.start ?? "top 80%",
       end: options.end ?? "bottom 20%",
       onUpdate: (self) => {
         if (this.pausedState || this.destroyed) return;
-        const next = allowReverse ? self.progress : Math.max(this.currentProgress, self.progress);
+        const next = this.allowReverse ? self.progress : Math.max(this.currentProgress, self.progress);
         this.applyProgress(next);
       }
     });
@@ -62,7 +65,9 @@ export class ScrollConstructionScene {
     if (this.destroyed || !this.pausedState) return;
     this.pausedState = false;
     this.timeline.resume();
-    const next = this.triggerInstance.progress;
+    const next = this.allowReverse
+      ? this.triggerInstance.progress
+      : Math.max(this.currentProgress, this.triggerInstance.progress);
     this.applyProgress(next);
   }
 
@@ -81,6 +86,7 @@ export class ScrollConstructionScene {
     const normalized = Math.max(0, Math.min(1, progress));
     this.currentProgress = normalized;
     this.timeline.progress(normalized);
+    this.onProgress?.(normalized);
   }
 }
 
