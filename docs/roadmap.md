@@ -19,7 +19,8 @@
 - [ ] Browser-level visual regression and performance profiling
 
 ## Interaction primitives
-- [x] Natural curved cursor paths, easing, configurable durations, and optional pauses\n- [ ] Richer click feedback
+- [x] Natural curved cursor paths, easing, configurable durations, and optional pauses
+- [ ] Richer click feedback
 - [ ] Drag/drop simulation
 - [ ] Element resizing and positioning
 - [ ] Animated text insertion
