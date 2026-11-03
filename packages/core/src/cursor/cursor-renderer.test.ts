@@ -7,7 +7,7 @@ vi.mock("gsap", () => {
   const set = vi.fn((target: Element, vars: Record<string, unknown>) => { Object.assign((target as HTMLElement).style, { transform: `translate(${vars.x ?? 0}px,${vars.y ?? 0}px)` }); });
   const to = vi.fn(() => ({ kill: vi.fn() }));
   const timeline = vi.fn(() => ({ to: vi.fn().mockReturnThis(), kill: vi.fn() }));
-  return { gsap: { set, to, timeline, killTweensOf: vi.fn() } };
+  return { gsap: { set, to, timeline, killTweensOf: vi.fn(), registerPlugin: vi.fn() } };
 });
 const renderers: CursorRenderer[] = [];
 afterEach(() => { renderers.splice(0).forEach((renderer) => renderer.destroy()); document.body.innerHTML = ""; vi.clearAllMocks(); });
@@ -43,5 +43,20 @@ describe("CursorRenderer", () => {
     const renderer = new CursorRenderer(manager, host); renderers.push(renderer);
     expect(host.style.position).toBe("relative"); renderer.destroy();
     expect(host.querySelector(".cursorbuild-overlay")).toBeNull(); expect(host.style.position).toBe("");
+  });
+});
+describe("CursorRenderer responsive behaviour", () => {
+  it("limits visible cursor nodes on mobile and restores them on desktop resize", () => {
+    const manager = new CursorManager(); const host = document.createElement("div"); document.body.append(host);
+    for (let index = 0; index < 4; index++) manager.add({ id: String(index), name: "Designer " + index, color: "#abc" });
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    const renderer = new CursorRenderer(manager, host); renderers.push(renderer);
+    const nodes = [...host.querySelectorAll<HTMLElement>(".cursorbuild-cursor")];
+    expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(2);
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
+    window.dispatchEvent(new Event("resize"));
+    expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(4);
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
   });
 });
