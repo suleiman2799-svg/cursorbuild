@@ -164,6 +164,7 @@ export class CursorRenderer {
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new TypeError("Cursor coordinates must be finite numbers.");
     if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Movement duration must be finite and non-negative.");
     this.stopTextInsertion(id);
+    this.stopDrag(id);
     this.naturalMovement.cancel(id);
     this.positions.set(id, { ...point });
     const node = this.nodes.get(id)!.element;
@@ -174,10 +175,10 @@ export class CursorRenderer {
   }
 
   moveNaturally(id: string, point: CursorPoint, options: NaturalMoveOptions = {}): gsap.core.Timeline | undefined {
-    this.assertActive(); this.stopTextInsertion(id); this.cancelRendererTween(id); return this.naturalMovement.moveTo(id, point, options);
+    this.assertActive(); this.stopTextInsertion(id); this.stopDrag(id); this.cancelRendererTween(id); return this.naturalMovement.moveTo(id, point, options);
   }
   moveSequence(id: string, steps: NaturalMovementStep[], options: NaturalMovementOptions = {}): gsap.core.Timeline | undefined {
-    this.assertActive(); this.stopTextInsertion(id); this.cancelRendererTween(id); return this.naturalMovement.playSequence(id, steps, options);
+    this.assertActive(); this.stopTextInsertion(id); this.stopDrag(id); this.cancelRendererTween(id); return this.naturalMovement.playSequence(id, steps, options);
   }
   stopNaturalMovement(id: string): void { this.assertActive(); this.naturalMovement.cancel(id); }
 
@@ -396,6 +397,7 @@ export class CursorRenderer {
     caret.setAttribute("aria-hidden", "true");
     caret.style.display = "none";
     caret.style.backgroundColor = this.nodes.get(id)!.color;
+    caret.style.color = this.nodes.get(id)!.color;
     this.overlay.appendChild(caret);
     const typingDuration = interval === undefined ? duration : (interval * characters.length) / 1000;
     const startCursor = this.getPosition(id);
@@ -424,7 +426,7 @@ export class CursorRenderer {
       this.positionTypingCaret(id, record, value);
     };
     if (this.reducedMotion || characters.length === 0 || (typingDuration === 0 && delay === 0)) {
-      element.focus();
+      element.focus({ preventScroll: true });
       updateText(characters.length);
       this.setNaturalPosition(id, this.positionForTypingCaret(record, baseText + characters.join("")));
       this.finishTextInsertion(id, record);
