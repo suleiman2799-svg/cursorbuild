@@ -52,7 +52,7 @@ describe("CursorRenderer responsive behaviour", () => {
     const originalWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
     const renderer = new CursorRenderer(manager, host); renderers.push(renderer);
-    const nodes = [...host.querySelectorAll<HTMLElement>(".cursorbuild-cursor")];
+    const nodes = Array.from(host.querySelectorAll<HTMLElement>(".cursorbuild-cursor"));
     expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(2);
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
     window.dispatchEvent(new Event("resize"));
