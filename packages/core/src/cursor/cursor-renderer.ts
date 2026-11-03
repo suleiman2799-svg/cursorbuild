@@ -54,7 +54,11 @@ export class CursorRenderer {
     this.reducedMotion = this.options.respectReducedMotion && !!this.mediaQuery?.matches;
 
     this.originalPosition = container.style.position;
-    this.changedContainerPosition = window.getComputedStyle(container).position === "static";
+    const computedPosition = window.getComputedStyle(container).position;
+    // Some DOM test environments return an empty computed value for the default
+    // static position. Treat that as static so the absolute overlay has a
+    // reliable containing block in browsers and non-layout DOM environments.
+    this.changedContainerPosition = !computedPosition || computedPosition === "static";
     if (this.changedContainerPosition) container.style.position = "relative";
 
     this.overlay = document.createElement("div");
