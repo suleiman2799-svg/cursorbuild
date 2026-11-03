@@ -26,7 +26,7 @@
 
 ## Orchestration
 - [ ] Declarative timelines and reusable scroll scenes
-- [ ] Multi-cursor coordination and conflict rules
+- [x] Multi-cursor coordination and dependency/cancellation rules (PR #9)
 - [ ] Responsive scene composition and reduced-motion strategy
 
 ## Ecosystem
@@ -34,3 +34,13 @@
 - [ ] API reference and integration examples
 - [ ] Accessibility and performance benchmarks
 - [ ] Release automation
+
+## Multi-cursor coordination engine — implemented in PR #9
+- [x] Parallel and sequential collaborator action groups
+- [x] Explicit dependency graph with cycle and missing-dependency validation
+- [x] Cursor-scoped action contexts and AbortSignal propagation
+- [x] Await returned GSAP animations and Promises
+- [x] Per-action, per-group, and engine-level cancellation
+- [x] Configurable action start staggering
+- [x] Failure propagation and sibling cancellation
+- [x] Responsive demo using coordinated simultaneous drags
