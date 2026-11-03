@@ -2,7 +2,7 @@
 
 **CursorBuild** is an open-source, modular foundation for scroll-driven, multi-cursor website construction animations.
 
-> **Status: early development (v0.3.0).** The foundation, multiple-cursor rendering, natural movement, configurable visual click feedback, and drag/drop simulation are implemented. Resizing, text insertion, and full cinematic construction sequences remain planned.
+> **Status: early development (v0.3.0).** The foundation, multiple-cursor rendering, natural movement, configurable visual click feedback, and drag/drop simulation are implemented. Text insertion simulation is now implemented; element resizing and full cinematic construction sequences remain planned.
 
 ## Technology stack
 - **TypeScript** — framework-agnostic core
@@ -141,3 +141,23 @@ renderer.stopDrag("designer");   // cancel and restore the original inline trans
 `duration` defaults to 1.2 seconds; `curvature` defaults to 0.16 (0–1), and `grabScale` defaults to 0.82 (greater than 0 and at most 1). The destination is the element's top-left position relative to the mounted container's content origin. The renderer animates the CSS individual `translate` property, preserving the element's existing `transform`; successful drops retain the new position. Cancellation restores the original inline `translate` value.
 
 Different cursors can drag different elements concurrently. An element is locked to one cursor until release or cancellation. Removed targets, cursor removal, and renderer destruction cancel the operation and release its lock. Reduced-motion mode skips the animation and places the element at its destination immediately. Dragging is a visual simulation only: CursorBuild does not dispatch browser mouse or pointer events, and it does not make arbitrary elements natively draggable.
+## Text insertion simulation
+
+The typeText() API moves a cursor naturally to a supported text target, focuses it with visual press feedback, then reveals text progressively beside a blinking caret:
+
+~~~ts
+renderer.typeText("designer", {
+  target: "#hero-heading", // CSS selector or HTMLElement
+  text: "Welcome to CursorBuild",
+  duration: 2.5,            // typing phase, seconds
+  initialDelay: 0.2,        // pause before the first character
+  mode: "replace"           // "replace" | "append"
+});
+
+renderer.isTyping("designer");          // true while active
+renderer.stopTextInsertion("designer"); // cancel and restore original content
+~~~
+
+Use characterIntervalMs instead of duration to specify a per-character interval in milliseconds. Duration defaults to 1.8 seconds, initialDelay to 0.12 seconds, and mode to replace. Targets must be contained by the mounted container and must be a text-like input (text, search, email, URL, telephone, or password), textarea, or [contenteditable="true"] element. Contenteditable insertion is plain text; replace mode temporarily detaches existing child nodes and restores them if cancelled.
+
+Typing is a visual DOM simulation. CursorBuild focuses the target and updates its value/text progressively, but does not dispatch keyboard, beforeinput, or input events. **Controlled React/Vue/etc. inputs may not synchronize their framework state** with these programmatic value changes; use an application callback/state update or an uncontrolled input for framework-managed forms. Cancellation restores the original value/content and removes the temporary caret. Removed targets, cursor removal, renderer destruction, and reduced-motion preferences are handled automatically. The caret and cursor use the existing overlay; no new dependency is required.
