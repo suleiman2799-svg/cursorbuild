@@ -14,7 +14,10 @@ export class CursorBuildEngine {
  readonly construction: ScrollConstructionEngine;
  private readonly cursorRenderers = new Set<CursorRenderer>();
  private destroyed = false;
- constructor(config: Partial<CursorBuildConfig> = {}) { this.config = resolveConfig(config); }
+ constructor(config: Partial<CursorBuildConfig> = {}) {
+  this.config = resolveConfig(config);
+  this.construction = new ScrollConstructionEngine(this.config.respectReducedMotion);
+ }
  /** Attach a visual cursor layer. Coordinates are container-relative CSS pixels. */
  mountCursors(container: HTMLElement, options: CursorRendererOptions = {}): CursorRenderer {
   if (this.destroyed) throw new Error("CursorBuildEngine has been destroyed.");
