@@ -23,14 +23,14 @@ export default function App() {
   }});
   rendererRef.current = renderer;
   const timeline = engine.animations.createTimeline("demo-cursor-loop", { repeat: -1, repeatDelay: 0.25 });
-  timeline.call(() => renderer.moveTo("maya", pointAt(0.28, 0.4)));
+  timeline.call(() => renderer.moveNaturally("maya", pointAt(0.28, 0.4)));
   timeline.call(() => renderer.click("maya"), [], "+=0.7");
-  timeline.call(() => renderer.moveTo("noah", pointAt(0.65, 0.58)));
+  timeline.call(() => renderer.moveNaturally("noah", pointAt(0.65, 0.58)));
   timeline.call(() => renderer.click("noah"), [], "+=0.55");
-  timeline.call(() => renderer.moveTo("zoe", pointAt(0.32, 0.72)));
-  timeline.call(() => renderer.moveTo("maya", pointAt(0.76, 0.26)), [], "+=0.5");
-  timeline.call(() => renderer.moveTo("noah", pointAt(0.12, 0.2)));
-  timeline.call(() => renderer.moveTo("zoe", pointAt(0.78, 0.65)), [], "+=0.4");
+  timeline.call(() => renderer.moveNaturally("zoe", pointAt(0.32, 0.72)));
+  timeline.call(() => renderer.moveNaturally("maya", pointAt(0.76, 0.26)), [], "+=0.5");
+  timeline.call(() => renderer.moveNaturally("noah", pointAt(0.12, 0.2)));
+  timeline.call(() => renderer.moveNaturally("zoe", pointAt(0.78, 0.65)), [], "+=0.4");
   return () => {
    timeline.kill(); engine.animations.kill("demo-cursor-loop"); renderer.destroy(); rendererRef.current = null;
    starterCursors.forEach((cursor) => engine.cursors.remove(cursor.id));
