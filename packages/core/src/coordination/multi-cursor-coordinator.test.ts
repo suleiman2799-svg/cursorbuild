@@ -31,6 +31,7 @@ function createAnimation() {
 const coordinators: MultiCursorCoordinator[] = [];
 afterEach(() => {
   coordinators.splice(0).forEach((coordinator) => coordinator.destroy());
+  vi.useRealTimers();
   vi.clearAllMocks();
 });
 
