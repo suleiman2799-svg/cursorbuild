@@ -101,6 +101,11 @@ interface RuntimeAction {
   promise?: Promise<void>;
 }
 
+/** Read cancellation state outside the caller's narrowed control-flow path. */
+function isActionCancelled(action: RuntimeAction): boolean {
+  return action.status === "cancelled";
+}
+
 export class CoordinatedActionGroup {
   private readonly actions = new Map<string, RuntimeAction>();
   private readonly groupController = new AbortController();
@@ -234,7 +239,7 @@ export class CoordinatedActionGroup {
           this.groupController.signal.removeEventListener("abort", abortFromGroup);
         }
       } catch (error) {
-        if (action.status !== "cancelled") {
+        if (!isActionCancelled(action)) {
           action.status = (error as { name?: string })?.name === "AbortError" ? "cancelled" : "failed";
         }
         if (action.status === "failed") {
