@@ -2,7 +2,7 @@
 
 **CursorBuild** is an open-source, modular foundation for scroll-driven, multi-cursor website construction animations.
 
-> **Status: early development (v0.3.0).** The foundation, multiple-cursor rendering, natural movement, configurable visual click feedback, and drag/drop simulation are implemented. Text insertion simulation is now implemented; element resizing and full cinematic construction sequences remain planned.
+> **Status: early development (v0.7.0).** The foundation, multiple-cursor rendering, natural movement, click feedback, drag/drop, text insertion, and multi-cursor action coordination are implemented. The cinematic engine, scroll construction, and element resizing are in open review PRs #7, #8, and #6 respectively.
 
 ## Technology stack
 - **TypeScript** — framework-agnostic core
@@ -82,6 +82,39 @@ renderer.click("designer-2", { style: "press", duration: 0.24 });
 Defaults are 0.32 seconds, ripple scale 2.15, intensity 0.72, and combined press/ripple style. A press compresses and releases the SVG pointer; a ripple animates the existing halo node, so no temporary DOM elements are created. Each cursor owns an independent click timeline. A new click replaces only that same cursor's active click animation. Click feedback is visual only and never triggers page interaction.
 
 When `prefers-reduced-motion: reduce` is active and `respectReducedMotion` is enabled (the default), click animations are suppressed and movement snaps to its destination. Set `respectReducedMotion: false` only when your application has an explicit alternative accessibility strategy.
+
+## Multi-cursor coordination
+
+Coordinate actions across collaborator cursors without coupling the coordinator to a particular renderer or UI framework. Actions call the existing APIs and return GSAP timelines when the coordinator should wait for their completion:
+
+~~~ts
+const renderer = engine.mountCursors(container);
+
+await engine.coordination.runGroup("hero-collaboration", [
+  {
+    id: "maya-types-title", cursorId: "maya",
+    run: () => renderer.typeText("maya", {
+      target: "#hero-title", text: "Build together", duration: 1.4
+    })
+  },
+  {
+    id: "noah-drags-artwork", cursorId: "noah",
+    run: () => renderer.drag("noah", {
+      target: "#hero-artwork", to: { x: 420, y: 180 }, duration: 1.2
+    })
+  }
+],
+  { mode: "parallel", delayBetween: 0.08 }
+);
+
+// Use mode: "sequence" to run actions in listed/dependency order.
+// dependsOn can express prerequisites even in parallel groups.
+engine.coordination.cancelAction("noah-drags-artwork");
+engine.coordination.cancelGroup("hero-collaboration");
+engine.destroy();
+~~~
+
+Each action has a unique id, a cursor id, and a callback. The callback receives an AbortSignal and may return a GSAP animation or a Promise; the group waits for completion before resolving. Parallel groups run independent actions together, while sequence groups wait for each action. `dependsOn` creates explicit prerequisites in either mode, and `delayBetween` staggers action start times in seconds. `cancelAction`, `cancelGroup`, and `destroy` abort work and kill returned GSAP animations. Errors propagate to the caller and cancel the remaining group actions. Cursor IDs are caller-supplied; the coordinator does not create, own, or validate cursor identities.
 
 ## Getting started
 
