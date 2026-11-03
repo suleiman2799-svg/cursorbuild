@@ -13,6 +13,8 @@ export interface ScrollConstructionSceneOptions {
   reverse?: boolean;
   /** Receives the normalized scene progress (0–1). */
   onProgress?: (progress: number) => void;
+  /** Complete the scene immediately when reduced motion is preferred. Defaults to true. */
+  respectReducedMotion?: boolean;
 }
 
 export type ScrollConstructionBuilder = (timeline: gsap.core.Timeline) => void;
@@ -25,6 +27,18 @@ export class ScrollConstructionScene {
   private readonly triggerInstance: ScrollTriggerInstance;
   private readonly allowReverse: boolean;
   private readonly onProgress?: (progress: number) => void;
+  private readonly respectReducedMotion: boolean;
+  private readonly mediaQuery?: MediaQueryList;
+  private reducedMotion = false;
+  private readonly handleMotionChange = (event: MediaQueryListEvent): void => {
+    this.reducedMotion = this.respectReducedMotion && event.matches;
+    if (this.reducedMotion) {
+      this.applyProgress(1);
+    } else if (!this.pausedState && !this.destroyed) {
+      const next = this.allowReverse ? this.triggerInstance.progress : Math.max(this.currentProgress, this.triggerInstance.progress);
+      this.applyProgress(next);
+    }
+  };
 
   constructor(
     readonly id: string,
@@ -33,17 +47,23 @@ export class ScrollConstructionScene {
   ) {
     this.allowReverse = options.reverse ?? true;
     this.onProgress = options.onProgress;
+    this.respectReducedMotion = options.respectReducedMotion ?? true;
+    this.mediaQuery = this.respectReducedMotion && typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)")
+      : undefined;
+    this.reducedMotion = !!this.mediaQuery?.matches;
     this.triggerInstance = ScrollTrigger.create({
       trigger: options.trigger,
       start: options.start ?? "top 80%",
       end: options.end ?? "bottom 20%",
       onUpdate: (self) => {
-        if (this.pausedState || this.destroyed) return;
+        if (this.pausedState || this.destroyed || this.reducedMotion) return;
         const next = this.allowReverse ? self.progress : Math.max(this.currentProgress, self.progress);
         this.applyProgress(next);
       }
     });
-    this.applyProgress(this.triggerInstance.progress);
+    this.mediaQuery?.addEventListener?.("change", this.handleMotionChange);
+    this.applyProgress(this.reducedMotion ? 1 : this.triggerInstance.progress);
   }
 
   /** Current normalized scroll progress, from 0 to 1. */
@@ -65,8 +85,7 @@ export class ScrollConstructionScene {
   resume(): void {
     if (this.destroyed || !this.pausedState) return;
     this.pausedState = false;
-    this.timeline.resume();
-    const next = this.allowReverse
+    const next = this.reducedMotion ? 1 : this.allowReverse
       ? this.triggerInstance.progress
       : Math.max(this.currentProgress, this.triggerInstance.progress);
     this.applyProgress(next);
@@ -80,6 +99,7 @@ export class ScrollConstructionScene {
     if (this.destroyed) return;
     this.destroyed = true;
     this.triggerInstance.kill();
+    this.mediaQuery?.removeEventListener?.("change", this.handleMotionChange);
     this.timeline.kill();
   }
 
