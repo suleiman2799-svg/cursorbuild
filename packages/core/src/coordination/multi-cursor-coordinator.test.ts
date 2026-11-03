@@ -40,6 +40,10 @@ function setup() {
   return coordinator;
 }
 
+async function flushActionScheduling(): Promise<void> {
+  for (let index = 0; index < 6; index += 1) await flushActionScheduling();
+}
+
 describe("MultiCursorCoordinator", () => {
   it("runs collaborator actions concurrently and passes cursor-scoped context", async () => {
     const coordinator = setup();
@@ -76,7 +80,7 @@ describe("MultiCursorCoordinator", () => {
       { id: "first", cursorId: "maya", run: () => { starts.push("first"); } },
       { id: "second", cursorId: "noah", run: () => { starts.push("second"); } }
     ], { mode: "parallel", delayBetween: 0.05 });
-    await Promise.resolve();
+    await flushActionScheduling();
     expect(starts).toEqual(["first"]);
     await vi.advanceTimersByTimeAsync(49);
     expect(starts).toEqual(["first"]);
@@ -102,11 +106,11 @@ describe("MultiCursorCoordinator", () => {
     const done = coordinator.runGroup("animated", [
       { id: "move", cursorId: "maya", run: () => animation as never }
     ]);
-    await Promise.resolve();
+    await flushActionScheduling();
     expect(coordinator.getActiveActionIds()).toEqual(["move"]);
     let finished = false;
     void done.then(() => { finished = true; });
-    await Promise.resolve();
+    await flushActionScheduling();
     expect(finished).toBe(false);
     complete();
     await done;
@@ -120,7 +124,7 @@ describe("MultiCursorCoordinator", () => {
     const prior = vi.fn();
     animation.eventCallback("onComplete", prior);
     const done = coordinator.runGroup("callbacks", [{ id: "animation", cursorId: "maya", run: () => animation as never }]);
-    await Promise.resolve();
+    await flushActionScheduling();
     complete();
     await done;
     expect(prior).toHaveBeenCalledOnce();
@@ -130,7 +134,7 @@ describe("MultiCursorCoordinator", () => {
     const coordinator = setup();
     const { animation } = createAnimation();
     const done = coordinator.runGroup("cancel-one", [{ id: "drag", cursorId: "maya", run: () => animation as never }]);
-    await Promise.resolve();
+    await flushActionScheduling();
     expect(coordinator.cancelAction("drag")).toBe(true);
     await expect(done).rejects.toMatchObject({ name: "AbortError" });
     expect(animation.kill).toHaveBeenCalledOnce();
@@ -145,7 +149,7 @@ describe("MultiCursorCoordinator", () => {
       { id: "a", cursorId: "maya", run: () => first.animation as never },
       { id: "b", cursorId: "noah", run: () => second.animation as never }
     ]);
-    await Promise.resolve();
+    await flushActionScheduling();
     expect(coordinator.cancelGroup("cancel-all")).toBe(true);
     await expect(done).rejects.toMatchObject({ name: "AbortError" });
     expect(first.animation.kill).toHaveBeenCalledOnce();
@@ -186,7 +190,7 @@ describe("MultiCursorCoordinator", () => {
     const coordinator = setup();
     const animation = createAnimation();
     const done = coordinator.runGroup("same", [{ id: "active", cursorId: "maya", run: () => animation.animation as never }]);
-    await Promise.resolve();
+    await flushActionScheduling();
     await expect(coordinator.runGroup("same", [{ id: "other", cursorId: "noah", run: () => undefined }])).rejects.toThrow(/already running/);
     coordinator.destroy();
     await expect(done).rejects.toMatchObject({ name: "AbortError" });
