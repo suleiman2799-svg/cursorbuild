@@ -452,32 +452,82 @@ describe("CursorRenderer element resizing simulation", () => {
     expect(gsapState.timelines[0].kill).toHaveBeenCalled();
   });
 
-  it("keeps the opposite edge or corner anchored for every resize handle", () => {
+  it("keeps the opposite edge or corner stationary throughout all eight resize directions", () => {
     const cases = [
-      ["top-left", -20, -10],
-      ["top", 0, -10],
-      ["top-right", 0, -10],
-      ["right", 0, 0],
-      ["bottom-right", 0, 0],
-      ["bottom", 0, 0],
-      ["bottom-left", -20, 0],
-      ["left", -20, 0]
+      ["top-left", "bottom-right"],
+      ["top", "bottom"],
+      ["top-right", "bottom-left"],
+      ["right", "left"],
+      ["bottom-right", "top-left"],
+      ["bottom", "top"],
+      ["bottom-left", "top-right"],
+      ["left", "right"]
     ] as const;
-    cases.forEach(([handle, expectedX, expectedY]) => {
+    const readTranslate = (part: string): number => {
+      const calc = part.match(/^calc\(([-\d.]+)px \+ ([-\d.]+)px\)$/);
+      return calc ? Number(calc[1]) + Number(calc[2]) : Number.parseFloat(part) || 0;
+    };
+
+    cases.forEach(([handle, anchor]) => {
       const { host, renderer } = setup(["a"]);
       const target = addResizeTarget(host);
+      target.style.transform = "none";
       target.style.translate = "12px 4px";
+      const measure = () => {
+        const parts = target.style.translate.split(/\s+/);
+        const tx = readTranslate(parts[0] || "0px");
+        const ty = readTranslate(parts[1] || "0px");
+        const left = 10 + tx, top = 20 + ty;
+        const width = Number.parseFloat(target.style.width);
+        const height = Number.parseFloat(target.style.height);
+        return { left, top, right: left + width, bottom: top + height, width, height };
+      };
+      vi.spyOn(target, "getBoundingClientRect").mockImplementation(() => {
+        const box = measure();
+        return {
+          x: box.left, y: box.top, left: box.left, top: box.top,
+          right: box.right, bottom: box.bottom, width: box.width, height: box.height,
+          toJSON: () => ({})
+        } as DOMRect;
+      });
+
+      const initial = measure();
       renderer.resize("a", { target, to: { width: 140, height: 100 }, handle });
       const resizeTween = gsapState.timelines[gsapState.timelines.length - 1].to.mock.calls[1];
-      resizeTween[0].value = 0.5;
-      resizeTween[1].onUpdate();
-      const dx = expectedX === 0 ? 0 : expectedX;
-      const dy = expectedY === 0 ? 0 : expectedY;
-      const expectedTranslate = dx === 0 && dy === 0
-        ? "12px 4px"
-        : `calc(12px + ${dx}px) calc(4px + ${dy}px)`;
-      expect(target.style.translate).toBe(expectedTranslate);
-      expect(target.style.transform).toBe("rotate(4deg)");
+      const progress = resizeTween[0] as { value: number };
+      const onUpdate = resizeTween[1].onUpdate as () => void;
+
+      for (const value of [0.25, 0.5, 0.75]) {
+        progress.value = value;
+        onUpdate();
+        const current = measure();
+        if (anchor === "top-left" || anchor === "bottom-left") {
+          expect(current.left).toBeCloseTo(initial.left, 5);
+        }
+        if (anchor === "top-right" || anchor === "bottom-right") {
+          expect(current.right).toBeCloseTo(initial.right, 5);
+        }
+        if (anchor === "top-left" || anchor === "top-right") {
+          expect(current.top).toBeCloseTo(initial.top, 5);
+        }
+        if (anchor === "bottom-left" || anchor === "bottom-right") {
+          expect(current.bottom).toBeCloseTo(initial.bottom, 5);
+        }
+        if (anchor === "top" || anchor === "bottom") {
+          expect(current.left).toBeCloseTo(initial.left, 5);
+          expect(current.right).toBeCloseTo(initial.right, 5);
+          expect(anchor === "top" ? current.bottom : current.top)
+            .toBeCloseTo(anchor === "top" ? initial.bottom : initial.top, 5);
+        }
+        if (anchor === "left" || anchor === "right") {
+          expect(current.top).toBeCloseTo(initial.top, 5);
+          expect(current.bottom).toBeCloseTo(initial.bottom, 5);
+          expect(anchor === "left" ? current.right : current.left)
+            .toBeCloseTo(anchor === "left" ? initial.right : initial.left, 5);
+        }
+      }
+
+      expect(target.style.transform).toBe("none");
       renderer.stopResize("a");
       expect(target.style.translate).toBe("12px 4px");
       expect(target.style.width).toBe("100px");
