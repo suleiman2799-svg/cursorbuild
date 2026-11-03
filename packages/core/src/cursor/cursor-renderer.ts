@@ -58,7 +58,7 @@ const CLICK_DEFAULTS: Required<CursorClickFeedbackOptions> = {
   duration: 0.32, rippleSize: 2.15, intensity: 0.72, style: "ripple-press"
 };
 
-/** Renders cursor identities into a non-interactive overlay. Coordinates are container-relative CSS pixels. */
+function sampleDragBezier(from: CursorPoint, c1: CursorPoint, c2: CursorPoint, to: CursorPoint, t: number): CursorPoint {\n  const u = 1 - t;\n  return { x: u*u*u*from.x + 3*u*u*t*c1.x + 3*u*t*t*c2.x + t*t*t*to.x, y: u*u*u*from.y + 3*u*u*t*c1.y + 3*u*t*t*c2.y + t*t*t*to.y };\n}\n\n/** Renders cursor identities into a non-interactive overlay. Coordinates are container-relative CSS pixels. */
 export class CursorRenderer {
   private readonly overlay: HTMLDivElement;
   readonly naturalMovement: NaturalCursorMovementEngine;
