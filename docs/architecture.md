@@ -19,6 +19,12 @@ Cursor rendering is deliberately separate from identity state: consumers can use
 
 Default visible cursor limits are 8 on desktop, 3 on tablet (up to 900px), and 2 on mobile (up to 600px). These limits can be overridden per renderer. The renderer follows prefers-reduced-motion when enabled: movement becomes immediate and click pulses are suppressed.
 
+## Natural cursor movement
+
+NaturalCursorMovementEngine is owned by CursorRenderer and exposed through `renderer.naturalMovement`, with convenience methods `moveNaturally()`, `moveSequence()`, and `stopNaturalMovement()`. It builds deterministic cubic Bezier arcs from the current container-relative position to each destination and animates a progress value with GSAP. Per-cursor timelines are isolated, allowing several cursors to move concurrently. Duration, GSAP easing, curvature, and inter-step pauses can be configured globally or per step.
+
+The renderer remains responsible for writing positions to its cursor nodes. Starting a natural route cancels that cursor's existing direct movement tween; calling the legacy `moveTo()` cancels its natural route. Removing a cursor or destroying the renderer kills its natural timeline. If reduced motion becomes active during a route, the renderer completes the route immediately at its final destination. Coordinates are kept in the same container-relative CSS-pixel space used by the existing renderer, preserving its responsive visibility and layout behaviour.
+
 ## Extension approach
 
 Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport, real collaboration networking, drag/drop, resizing, text insertion, and construction-scene authoring are future modules, not part of the current renderer.

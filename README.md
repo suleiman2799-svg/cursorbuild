@@ -42,6 +42,35 @@ renderer.click("designer"); // visual pulse only; does not dispatch a DOM click
 
 Coordinates are CSS pixels relative to the mounted container. The overlay uses pointer-events: none and never captures input. Visible cursor count is capped by viewport width (desktop 8, tablet 3, mobile 2 by default). Reduced-motion preferences disable movement tweening and click pulses.
 
+## Natural cursor movement
+
+The renderer exposes natural movement without changing the existing `moveTo()` API. Each cursor gets its own GSAP timeline, so multiple identities can travel at the same time.
+
+```ts
+// One curved movement; duration is seconds and easing accepts GSAP ease names.
+renderer.moveNaturally("designer", { x: 420, y: 180 }, {
+  duration: 1.1,
+  ease: "power3.inOut",
+  curvature: 0.2
+});
+
+// A route with a natural pause between destinations.
+renderer.moveSequence("designer", [
+  { to: { x: 180, y: 120 }, duration: 0.8 },
+  { to: { x: 360, y: 240 }, pauseAfter: 0.35 },
+  { to: { x: 520, y: 100 } }
+], {
+  duration: 0.9,
+  ease: "power2.inOut",
+  pauseBetween: [0.15, 0.45]
+});
+
+// Stop only this cursor's natural route.
+renderer.stopNaturalMovement("designer");
+```
+
+`curvature` ranges from 0 (straight) to 1 (strong arc); the default is 0.18. `duration` defaults to the renderer's configured duration, and `ease` defaults to its configured easing. `pauseBetween` accepts seconds or a [minimum, maximum] range; an individual step's `pauseAfter` overrides it. Coordinates remain CSS pixels relative to the mounted container, so movement paths work with the renderer's responsive layout. When reduced motion is requested, routes snap to their final destination without tweening or pauses. Existing `moveTo()`, click feedback, visibility limits, and renderer cleanup remain supported.
+
 ## Getting started
 
 Requires Node.js 20+ and npm.
@@ -65,8 +94,8 @@ npm run typecheck
 
 ## Roadmap
 1. **Foundation:** engine lifecycle, configuration, cursor registry, GSAP/ScrollTrigger managers, action sequencing, React integration, demo, and tests.
-2. **Cursor rendering (current):** multiple DOM cursors, identity labels/colors, programmatic movement, click pulse, responsive visibility, and reduced-motion support.
-3. **Interaction primitives:** natural movement profiles, richer click feedback, drag/drop, resizing, positioning, and animated text insertion.
+2. **Cursor rendering and natural movement (current):** multiple DOM cursors, identity labels/colors, direct and curved movement, configurable easing/duration, optional pauses, click pulse, responsive visibility, and reduced-motion support.
+3. **Interaction primitives:** richer click feedback, drag/drop, resizing, positioning, and animated text insertion.
 4. **Orchestration:** declarative timelines, multi-cursor coordination, responsive scenes, and reduced-motion behaviour.
 5. **Production readiness:** browser integration tests, accessibility/performance validation, API documentation, and release automation.
 

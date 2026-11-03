@@ -1,6 +1,8 @@
 import { gsap } from "gsap";
 import type { CursorManager } from "./cursor-manager.js";
 import type { CursorIdentity } from "../types.js";
+import { NaturalCursorMovementEngine } from "./natural-cursor-movement.js";
+import type { NaturalMoveOptions, NaturalMovementOptions, NaturalMovementStep } from "./natural-cursor-movement.js";
 
 export interface CursorPoint { x: number; y: number; }
 export interface CursorRendererOptions {
@@ -12,6 +14,7 @@ export interface CursorRendererOptions {
   mobileMaxVisible?: number;
   respectReducedMotion?: boolean;
   initialPositions?: Record<string, CursorPoint>;
+  naturalMovement?: NaturalMovementOptions;
 }
 interface CursorNode { element: HTMLDivElement; label: HTMLSpanElement; color: string; name: string; }
 
@@ -21,12 +24,13 @@ interface CursorNode { element: HTMLDivElement; label: HTMLSpanElement; color: s
  */
 export class CursorRenderer {
   private readonly overlay: HTMLDivElement;
+  readonly naturalMovement: NaturalCursorMovementEngine;
   private readonly nodes = new Map<string, CursorNode>();
   private readonly positions = new Map<string, CursorPoint>();
   private readonly tweens = new Map<string, gsap.core.Tween>();
   private readonly pulses = new Map<string, gsap.core.Timeline>();
   private readonly unsubscribe: () => void;
-  private readonly options: Required<Omit<CursorRendererOptions, "initialPositions">>;
+  private readonly options: Required<Omit<CursorRendererOptions, "initialPositions" | "naturalMovement">>;
   private readonly initialPositions: Record<string, CursorPoint>;
   private readonly originalPosition: string;
   private readonly changedContainerPosition: boolean;
@@ -71,6 +75,17 @@ export class CursorRenderer {
     });
     container.appendChild(this.overlay);
 
+    this.naturalMovement = new NaturalCursorMovementEngine({
+      hasCursor: (id) => this.nodes.has(id),
+      getPosition: (id) => this.getPosition(id),
+      setPosition: (id, point) => this.setNaturalPosition(id, point),
+      isReducedMotion: () => this.reducedMotion
+    }, {
+      duration: this.options.duration,
+      ease: this.options.ease,
+      ...options.naturalMovement
+    });
+
     this.unsubscribe = manager.subscribe(() => this.sync());
     this.mediaQuery?.addEventListener?.("change", this.handleMotionChange);
     window.addEventListener("resize", this.handleResize, { passive: true });
@@ -83,6 +98,7 @@ export class CursorRenderer {
     if (!this.nodes.has(id)) throw new Error("Unknown rendered cursor: " + id);
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new TypeError("Cursor coordinates must be finite numbers.");
     if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Movement duration must be finite and non-negative.");
+    this.naturalMovement.cancel(id);
     this.positions.set(id, { ...point });
     const node = this.nodes.get(id)!.element;
     this.tweens.get(id)?.kill();
@@ -92,6 +108,26 @@ export class CursorRenderer {
     }
     const tween = gsap.to(node, { x: point.x, y: point.y, duration, ease: this.options.ease, overwrite: "auto" });
     this.tweens.set(id, tween);
+  }
+
+  /** Move one cursor along a natural curved path with configurable GSAP easing. */
+  moveNaturally(id: string, point: CursorPoint, options: NaturalMoveOptions = {}): gsap.core.Timeline | undefined {
+    this.assertActive();
+    this.cancelRendererTween(id);
+    return this.naturalMovement.moveTo(id, point, options);
+  }
+
+  /** Move one cursor through multiple curved destinations, with optional pauses between them. */
+  moveSequence(id: string, steps: NaturalMovementStep[], options: NaturalMovementOptions = {}): gsap.core.Timeline | undefined {
+    this.assertActive();
+    this.cancelRendererTween(id);
+    return this.naturalMovement.playSequence(id, steps, options);
+  }
+
+  /** Stop only the selected cursor's natural movement. */
+  stopNaturalMovement(id: string): void {
+    this.assertActive();
+    this.naturalMovement.cancel(id);
   }
 
   /** Play a restrained click pulse on a cursor without dispatching a DOM click. */
@@ -118,6 +154,7 @@ export class CursorRenderer {
     if (this.destroyed) return;
     this.destroyed = true;
     this.unsubscribe();
+    this.naturalMovement.destroy();
     this.mediaQuery?.removeEventListener?.("change", this.handleMotionChange);
     window.removeEventListener("resize", this.handleResize);
     this.tweens.forEach((tween) => tween.kill());
@@ -131,6 +168,7 @@ export class CursorRenderer {
   private readonly handleMotionChange = (event: MediaQueryListEvent): void => {
     this.reducedMotion = this.options.respectReducedMotion && event.matches;
     if (this.reducedMotion) {
+      this.naturalMovement.finishAll();
       this.tweens.forEach((tween) => tween.kill()); this.tweens.clear();
       this.positions.forEach((point, id) => { const node = this.nodes.get(id); if (node) gsap.set(node.element, { x: point.x, y: point.y }); });
       this.pulses.forEach((timeline) => timeline.kill()); this.pulses.clear();
@@ -181,7 +219,20 @@ export class CursorRenderer {
     }
   }
 
+  private cancelRendererTween(id: string): void {
+    this.tweens.get(id)?.kill();
+    this.tweens.delete(id);
+  }
+
+  private setNaturalPosition(id: string, point: CursorPoint): void {
+    const cursor = this.nodes.get(id);
+    if (!cursor) return;
+    this.positions.set(id, { ...point });
+    gsap.set(cursor.element, { x: point.x, y: point.y });
+  }
+
   private removeNode(id: string): void {
+    this.naturalMovement.cancel(id);
     this.tweens.get(id)?.kill(); this.tweens.delete(id);
     this.pulses.get(id)?.kill(); this.pulses.delete(id);
     const cursor = this.nodes.get(id);
