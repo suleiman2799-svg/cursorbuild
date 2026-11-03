@@ -77,6 +77,24 @@ describe("ScrollConstructionEngine", () => {
     expect(mocks.timeline.progress).toHaveBeenLastCalledWith(0.7);
   });
 
+  it("completes scenes for reduced motion and removes the preference listener", () => {
+    let motionListener: ((event: MediaQueryListEvent) => void) | undefined;
+    const mediaQuery = {
+      matches: true,
+      addEventListener: vi.fn((_type: string, listener: (event: MediaQueryListEvent) => void) => { motionListener = listener; }),
+      removeEventListener: vi.fn()
+    };
+    Object.defineProperty(window, "matchMedia", { configurable: true, value: vi.fn(() => mediaQuery) });
+    const engine = new ScrollConstructionEngine();
+    const scene = engine.createScene("reduced", { trigger: "#reduced" }, () => {});
+    expect(scene.progress).toBe(1);
+    const vars = mocks.create.mock.calls[0]?.[0] as unknown as { onUpdate: (self: { progress: number }) => void };
+    vars.onUpdate({ progress: 0.2 });
+    expect(scene.progress).toBe(1);
+    scene.destroy();
+    expect(mediaQuery.removeEventListener).toHaveBeenCalledWith("change", motionListener);
+  });
+
   it("pauses scroll updates and resumes at the current trigger position", () => {
     const engine = new ScrollConstructionEngine();
     const scene = engine.createScene("gallery", { trigger: "#gallery" }, () => {});
