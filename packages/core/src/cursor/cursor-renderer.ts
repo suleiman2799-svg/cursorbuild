@@ -18,6 +18,15 @@ export interface CursorClickFeedbackOptions {
   style?: CursorClickStyle;
 }
 export type DragTarget = string | HTMLElement;
+export type ResizeTarget = string | HTMLElement;
+export type ResizeHandle = "top-left" | "top-right" | "bottom-left" | "bottom-right" | "top" | "right" | "bottom" | "left";
+export interface CursorResizeOptions {
+  target: ResizeTarget;
+  to: { width: number; height: number };
+  duration?: number;
+  curvature?: number;
+  handle?: ResizeHandle;
+}
 export type TextInsertionTarget = string | HTMLElement;
 export type TextInsertionMode = "append" | "replace";
 export interface CursorTextInsertionOptions {
@@ -66,6 +75,17 @@ interface TextInsertionRecord {
   caretColor: string;
   clickTimeline?: gsap.core.Timeline;
 }
+interface ResizeRecord {
+  element: HTMLElement;
+  timeline: gsap.core.Timeline;
+  frame: HTMLDivElement;
+  originalWidth: string;
+  originalHeight: string;
+  cssTargetWidth: number;
+  cssTargetHeight: number;
+  handle: ResizeHandle;
+  clickTimeline?: gsap.core.Timeline;
+}
 interface DragRecord {
   element: HTMLElement;
   startElement: CursorPoint;
@@ -82,6 +102,7 @@ const CLICK_DEFAULTS: Required<CursorClickFeedbackOptions> = {
   duration: 0.32, rippleSize: 2.15, intensity: 0.72, style: "ripple-press"
 };
 
+const RESIZE_HANDLES: ResizeHandle[] = ["top-left", "top", "top-right", "right", "bottom-right", "bottom", "bottom-left", "left"];
 function sampleDragBezier(from: CursorPoint, c1: CursorPoint, c2: CursorPoint, to: CursorPoint, t: number): CursorPoint {
   const u = 1 - t;
   return {
@@ -103,6 +124,8 @@ export class CursorRenderer {
   private readonly dragLocks = new Map<HTMLElement, string>();
   private readonly activeTextInsertions = new Map<string, TextInsertionRecord>();
   private readonly textLocks = new Map<HTMLElement, string>();
+  private readonly activeResizes = new Map<string, ResizeRecord>();
+  private readonly resizeLocks = new Map<HTMLElement, string>();
   private readonly mutationObserver: MutationObserver;
   private readonly unsubscribe: () => void;
   private readonly options: Required<Omit<CursorRendererOptions, "initialPositions" | "naturalMovement" | "clickFeedback">>;
@@ -151,7 +174,7 @@ export class CursorRenderer {
     }, { duration: this.options.duration, ease: this.options.ease, ...options.naturalMovement });
 
     this.unsubscribe = manager.subscribe(() => this.sync());
-    this.mutationObserver = new MutationObserver(() => { this.cancelRemovedDrags(); this.cancelRemovedTextInsertions(); });
+    this.mutationObserver = new MutationObserver(() => { this.cancelRemovedDrags(); this.cancelRemovedTextInsertions(); this.cancelRemovedResizes(); });
     this.mutationObserver.observe(container, { childList: true, subtree: true });
     this.mediaQuery?.addEventListener?.("change", this.handleMotionChange);
     window.addEventListener("resize", this.handleResize, { passive: true });
@@ -165,6 +188,7 @@ export class CursorRenderer {
     if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Movement duration must be finite and non-negative.");
     this.stopTextInsertion(id);
     this.stopDrag(id);
+    this.stopResize(id);
     this.naturalMovement.cancel(id);
     this.positions.set(id, { ...point });
     const node = this.nodes.get(id)!.element;
@@ -175,7 +199,7 @@ export class CursorRenderer {
   }
 
   moveNaturally(id: string, point: CursorPoint, options: NaturalMoveOptions = {}): gsap.core.Timeline | undefined {
-    this.assertActive(); this.stopTextInsertion(id); this.stopDrag(id); this.cancelRendererTween(id); return this.naturalMovement.moveTo(id, point, options);
+    this.assertActive(); this.stopTextInsertion(id); this.stopDrag(id); this.stopResize(id); this.cancelRendererTween(id); return this.naturalMovement.moveTo(id, point, options);
   }
   moveSequence(id: string, steps: NaturalMovementStep[], options: NaturalMovementOptions = {}): gsap.core.Timeline | undefined {
     this.assertActive(); this.stopTextInsertion(id); this.stopDrag(id); this.cancelRendererTween(id); return this.naturalMovement.playSequence(id, steps, options);
@@ -247,12 +271,15 @@ export class CursorRenderer {
     if (!(element instanceof HTMLElement) || element === this.container || !this.container.contains(element)) {
       throw new Error("Drag target must be an HTMLElement contained by the mounted container.");
     }
+    const resizeOwner = this.resizeLocks.get(element);
+    if (resizeOwner && resizeOwner !== id) throw new Error("Target is being resized by cursor: " + resizeOwner);
     const textOwner = this.textLocks.get(element);
     if (textOwner && textOwner !== id) throw new Error("Target is being used by text insertion cursor: " + textOwner);
     const owner = this.dragLocks.get(element);
     if (owner && owner !== id) throw new Error("Drag target is already being dragged by cursor: " + owner);
     this.stopDrag(id);
     this.stopTextInsertion(id);
+    this.stopResize(id);
     this.naturalMovement.cancel(id);
     this.cancelRendererTween(id);
     this.clickTimelines.get(id)?.kill();
@@ -367,6 +394,8 @@ export class CursorRenderer {
     }
     const dragOwner = this.dragLocks.get(element);
     if (dragOwner) throw new Error("Target is already being dragged by cursor: " + dragOwner);
+    const resizeOwner = this.resizeLocks.get(element);
+    if (resizeOwner && resizeOwner !== id) throw new Error("Target is already being resized by cursor: " + resizeOwner);
     const textOwner = this.textLocks.get(element);
     if (textOwner && textOwner !== id) throw new Error("Text target is already being typed into by cursor: " + textOwner);
 
@@ -480,6 +509,140 @@ export class CursorRenderer {
     return this.activeTextInsertions.has(id);
   }
 
+  /**
+   * Approach an element, acquire one of its eight handles, and animate its size.
+   * This visual simulation never dispatches synthetic mouse or pointer events.
+   */
+  resize(id: string, options: CursorResizeOptions): gsap.core.Timeline | undefined {
+    this.assertActive();
+    if (!this.nodes.has(id)) throw new Error("Unknown rendered cursor: " + id);
+    if (!options || !options.target) throw new TypeError("A resize target is required.");
+    if (!options.to || !Number.isFinite(options.to.width) || !Number.isFinite(options.to.height) || options.to.width <= 0 || options.to.height <= 0) {
+      throw new RangeError("Resize dimensions must be finite positive numbers.");
+    }
+    const duration = options.duration ?? 1.2, curvature = options.curvature ?? 0.16, handle = options.handle ?? "bottom-right";
+    if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Resize duration must be finite and non-negative.");
+    if (!Number.isFinite(curvature) || curvature < 0 || curvature > 1) throw new RangeError("Resize curvature must be between 0 and 1.");
+    if (!RESIZE_HANDLES.includes(handle)) throw new TypeError("Unknown resize handle.");
+    const element = typeof options.target === "string" ? this.resolveResizeSelector(options.target) : options.target;
+    if (!(element instanceof HTMLElement) || element === this.container || !this.container.contains(element)) throw new Error("Resize target must be an HTMLElement contained by the mounted container.");
+    if (this.dragLocks.has(element)) throw new Error("Target is already being dragged by cursor: " + this.dragLocks.get(element));
+    if (this.textLocks.has(element)) throw new Error("Target is being used by text insertion cursor: " + this.textLocks.get(element));
+    const owner = this.resizeLocks.get(element);
+    if (owner && owner !== id) throw new Error("Target is already being resized by cursor: " + owner);
+    this.stopResize(id); this.stopDrag(id); this.stopTextInsertion(id);
+    this.naturalMovement.cancel(id); this.cancelRendererTween(id);
+    this.clickTimelines.get(id)?.kill(); this.clickTimelines.delete(id);
+
+    const rect = element.getBoundingClientRect(), containerRect = this.container.getBoundingClientRect();
+    const ox = containerRect.left + this.container.clientLeft - this.container.scrollLeft;
+    const oy = containerRect.top + this.container.clientTop - this.container.scrollTop;
+    const computed = window.getComputedStyle(element);
+    const extraW = (parseFloat(computed.paddingLeft)||0)+(parseFloat(computed.paddingRight)||0)+(parseFloat(computed.borderLeftWidth)||0)+(parseFloat(computed.borderRightWidth)||0);
+    const extraH = (parseFloat(computed.paddingTop)||0)+(parseFloat(computed.paddingBottom)||0)+(parseFloat(computed.borderTopWidth)||0)+(parseFloat(computed.borderBottomWidth)||0);
+    const cssW = computed.boxSizing === "border-box" ? options.to.width : Math.max(0,options.to.width-extraW);
+    const cssH = computed.boxSizing === "border-box" ? options.to.height : Math.max(0,options.to.height-extraH);
+    const originalWidth = element.style.width, originalHeight = element.style.height;
+    const frame = document.createElement("div");
+    frame.className = "cursorbuild-resize-frame"; frame.setAttribute("aria-hidden","true");
+    RESIZE_HANDLES.forEach((name)=>{
+      const node=document.createElement("span");
+      node.className="cursorbuild-resize-handle cursorbuild-resize-handle--"+name;
+      node.dataset.handle=name; frame.appendChild(node);
+    });
+    this.overlay.appendChild(frame);
+    const updateFrame=()=>{
+      if(!element.isConnected || !this.container.contains(element))return;
+      const r=element.getBoundingClientRect();
+      Object.assign(frame.style,{left:(r.left-ox)+"px",top:(r.top-oy)+"px",width:r.width+"px",height:r.height+"px"});
+    };
+    const handlePoint=():CursorPoint=>{
+      const r=element.getBoundingClientRect();
+      const x=handle.includes("left")?r.left:handle.includes("right")?r.right:r.left+r.width/2;
+      const y=handle.includes("top")?r.top:handle.includes("bottom")?r.bottom:r.top+r.height/2;
+      return {x:x-ox,y:y-oy};
+    };
+    updateFrame();
+    const start=this.getPosition(id);
+    if(!start){frame.remove();throw new Error("Cursor has no starting position: "+id);}
+    const destination=handlePoint(), controls=getNaturalControlPoints(start,destination,curvature,id+":resize");
+    const approach={value:0}, progress={value:0}, timeline=gsap.timeline();
+    const record:ResizeRecord={element,timeline,frame,originalWidth,originalHeight,cssTargetWidth:cssW,cssTargetHeight:cssH,handle};
+    this.resizeLocks.set(element,id);this.activeResizes.set(id,record);
+    const removed=()=>{
+      if(!element.isConnected || !this.container.contains(element)){this.cancelResizeRecord(id,record);return true;}
+      return false;
+    };
+    if(this.reducedMotion || duration===0){
+      element.style.width=cssW+"px";element.style.height=cssH+"px";
+      updateFrame();this.setNaturalPosition(id,handlePoint());this.finishResizeRecord(id,record);return undefined;
+    }
+    timeline.to(approach,{value:1,duration:duration*0.3,ease:"power2.inOut",onUpdate:()=>{
+      if(!removed())this.setNaturalPosition(id,sampleDragBezier(start,controls[0],controls[1],destination,approach.value));
+    }});
+    timeline.to(progress,{value:1,duration:duration*0.7,ease:"power2.inOut",
+      onStart:()=>{
+        if(this.activeResizes.get(id)!==record)return;
+        frame.setAttribute("data-grabbed","");
+        frame.querySelector('[data-handle="'+handle+'"]')?.classList.add("is-grabbed");
+        this.click(id,{style:"press",duration:0.16});record.clickTimeline=this.clickTimelines.get(id);
+      },
+      onUpdate:()=>{
+        if(this.activeResizes.get(id)!==record || removed())return;
+        const w=rect.width+(options.to.width-rect.width)*progress.value;
+        const h=rect.height+(options.to.height-rect.height)*progress.value;
+        element.style.width=(computed.boxSizing==="border-box"?w:Math.max(0,w-extraW))+"px";
+        element.style.height=(computed.boxSizing==="border-box"?h:Math.max(0,h-extraH))+"px";
+        updateFrame();this.setNaturalPosition(id,handlePoint());
+      }
+    });
+    timeline.eventCallback("onComplete",()=>{
+      if(this.activeResizes.get(id)!==record)return;
+      element.style.width=cssW+"px";element.style.height=cssH+"px";
+      updateFrame();this.setNaturalPosition(id,handlePoint());this.finishResizeRecord(id,record);
+    });
+    return timeline;
+  }
+  stopResize(id:string):void{
+    const record=this.activeResizes.get(id);if(record)this.cancelResizeRecord(id,record);
+  }
+  isResizing(id:string):boolean{
+    const record=this.activeResizes.get(id);
+    if(record && (!record.element.isConnected || !this.container.contains(record.element)))this.cancelResizeRecord(id,record);
+    return this.activeResizes.has(id);
+  }
+  private resolveResizeSelector(selector:string):HTMLElement{
+    let element:Element|null;
+    try{element=this.container.querySelector(selector);}catch{throw new TypeError("Resize target must be a valid CSS selector.");}
+    if(!(element instanceof HTMLElement))throw new Error("Resize selector did not match an HTMLElement inside the mounted container.");
+    return element;
+  }
+  private cancelRemovedResizes():void{
+    [...this.activeResizes.entries()].forEach(([id,record])=>{
+      if(!record.element.isConnected || !this.container.contains(record.element))this.cancelResizeRecord(id,record);
+    });
+  }
+  private cancelResizeRecord(id:string,record:ResizeRecord):void{
+    if(this.activeResizes.get(id)!==record)return;
+    record.timeline.kill();
+    if(record.clickTimeline && this.clickTimelines.get(id)===record.clickTimeline){record.clickTimeline.kill();this.clickTimelines.delete(id);}
+    record.element.style.width=record.originalWidth;record.element.style.height=record.originalHeight;
+    record.frame.remove();this.resizeLocks.delete(record.element);this.activeResizes.delete(id);
+  }
+  private finishResizeRecord(id:string,record:ResizeRecord):void{
+    if(this.activeResizes.get(id)!==record)return;
+    record.frame.remove();this.resizeLocks.delete(record.element);this.activeResizes.delete(id);
+  }
+  private completeResize(id:string,record:ResizeRecord):void{
+    if(this.activeResizes.get(id)!==record)return;
+    record.timeline.kill();record.element.style.width=record.cssTargetWidth+"px";record.element.style.height=record.cssTargetHeight+"px";
+    const r=record.element.getBoundingClientRect(),c=this.container.getBoundingClientRect();
+    const ox=c.left+this.container.clientLeft-this.container.scrollLeft,oy=c.top+this.container.clientTop-this.container.scrollTop;
+    const x=record.handle.includes("left")?r.left:record.handle.includes("right")?r.right:r.left+r.width/2;
+    const y=record.handle.includes("top")?r.top:record.handle.includes("bottom")?r.bottom:r.top+r.height/2;
+    this.setNaturalPosition(id,{x:x-ox,y:y-oy});this.finishResizeRecord(id,record);
+  }
+
   getPosition(id: string): CursorPoint | undefined { const point = this.positions.get(id); return point ? { ...point } : undefined; }
 
   destroy(): void {
@@ -489,6 +652,7 @@ export class CursorRenderer {
     this.mutationObserver.disconnect();
     [...this.activeDrags.entries()].forEach(([id, record]) => this.cancelDragRecord(id, record));
     [...this.activeTextInsertions.entries()].forEach(([id, record]) => this.cancelTextInsertionRecord(id, record));
+    [...this.activeResizes.entries()].forEach(([id, record]) => this.cancelResizeRecord(id, record));
     window.removeEventListener("resize", this.handleResize);
     this.tweens.forEach((tween) => tween.kill());
     this.clickTimelines.forEach((timeline) => timeline.kill());
@@ -506,6 +670,7 @@ export class CursorRenderer {
       this.positions.forEach((point, id) => { const node = this.nodes.get(id); if (node) gsap.set(node.element, { x: point.x, y: point.y }); });
       this.clickTimelines.forEach((timeline) => timeline.kill()); this.clickTimelines.clear();
       [...this.activeTextInsertions.entries()].forEach(([id, record]) => this.completeTextInsertion(id, record));
+      [...this.activeResizes.entries()].forEach(([id, record]) => this.completeResize(id, record));
       [...this.activeDrags.entries()].forEach(([id, record]) => {
         const pointer = this.nodes.get(id)?.element.querySelector<SVGElement>(".cursorbuild-cursor__button");
         record.timeline.kill();
@@ -696,6 +861,7 @@ export class CursorRenderer {
   private removeNode(id: string): void {
     this.stopDrag(id);
     this.stopTextInsertion(id);
+    this.stopResize(id);
     this.naturalMovement.cancel(id);
     this.tweens.get(id)?.kill(); this.tweens.delete(id);
     this.clickTimelines.get(id)?.kill(); this.clickTimelines.delete(id);
