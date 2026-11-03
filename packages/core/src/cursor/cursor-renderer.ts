@@ -1,6 +1,8 @@
 import { gsap } from "gsap";
 import type { CursorManager } from "./cursor-manager.js";
 import type { CursorIdentity } from "../types.js";
+import { NaturalCursorMovementEngine } from "./natural-cursor-movement.js";
+import type { NaturalMovementOptions, NaturalMovementStep } from "./natural-cursor-movement.js";
 
 export interface CursorPoint { x: number; y: number; }
 export interface CursorRendererOptions {
@@ -12,6 +14,7 @@ export interface CursorRendererOptions {
   mobileMaxVisible?: number;
   respectReducedMotion?: boolean;
   initialPositions?: Record<string, CursorPoint>;
+  naturalMovement?: NaturalMovementOptions;
 }
 interface CursorNode { element: HTMLDivElement; label: HTMLSpanElement; color: string; name: string; }
 
@@ -21,6 +24,7 @@ interface CursorNode { element: HTMLDivElement; label: HTMLSpanElement; color: s
  */
 export class CursorRenderer {
   private readonly overlay: HTMLDivElement;
+  readonly naturalMovement: NaturalCursorMovementEngine;
   private readonly nodes = new Map<string, CursorNode>();
   private readonly positions = new Map<string, CursorPoint>();
   private readonly tweens = new Map<string, gsap.core.Tween>();
@@ -92,6 +96,24 @@ export class CursorRenderer {
     }
     const tween = gsap.to(node, { x: point.x, y: point.y, duration, ease: this.options.ease, overwrite: "auto" });
     this.tweens.set(id, tween);
+  }
+
+  /** Move one cursor along a natural curved path with configurable GSAP easing. */
+  moveNaturally(id: string, point: CursorPoint, options: Omit<NaturalMovementStep, "pauseAfter"> = {}): gsap.core.Timeline | undefined {
+    this.assertActive();
+    return this.naturalMovement.moveTo(id, point, options);
+  }
+
+  /** Move one cursor through multiple curved destinations, with optional pauses between them. */
+  moveSequence(id: string, steps: NaturalMovementStep[], options: NaturalMovementOptions = {}): gsap.core.Timeline | undefined {
+    this.assertActive();
+    return this.naturalMovement.playSequence(id, steps, options);
+  }
+
+  /** Stop only the selected cursor's natural movement. */
+  stopNaturalMovement(id: string): void {
+    this.assertActive();
+    this.naturalMovement.cancel(id);
   }
 
   /** Play a restrained click pulse on a cursor without dispatching a DOM click. */
@@ -179,6 +201,13 @@ export class CursorRenderer {
       if (shape) shape.setAttribute("fill", identity.color);
       cursor.label.style.backgroundColor = identity.color;
     }
+  }
+
+  private setNaturalPosition(id: string, point: CursorPoint): void {
+    const cursor = this.nodes.get(id);
+    if (!cursor) return;
+    this.positions.set(id, { ...point });
+    gsap.set(cursor.element, { x: point.x, y: point.y });
   }
 
   private removeNode(id: string): void {
