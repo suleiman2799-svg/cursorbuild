@@ -85,6 +85,7 @@ export default function App() {
     <p>Watch collaborators focus a heading and type into a live input, character by character.</p>
     <label className="typing-field"><span>PROJECT NOTE</span><input id="typing-input" type="text" defaultValue="Your idea starts here." /></label>
     <div className="stage-card-row drag-card-row"><div id="drag-card-one" className="stage-card drag-card"><span/><strong>Design system</strong><small>Drag me · Maya</small></div><div id="drag-card-two" className="stage-card drag-card"><span/><strong>Live prototype</strong><small>Drag me · Noah</small></div></div>
+    <div id="resize-card" className="resize-card"><span className="resize-card-kicker">LIVE CANVAS ELEMENT</span><strong>Resize this composition</strong><small>Eight handles · Maya</small></div>
    </div></div>
    <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={!cursors.some((cursor) => cursor.id.startsWith("guest-"))}>− Remove cursor</button> <button onClick={replayTextInsertion}>⌨ Replay typing demo</button> <button onClick={replayDrags}>↻ Replay drag demo</button> <button onClick={replayResize}>⤢ Replay resize demo</button></div></div>
    <div className="cursor-legend">{cursors.map((cursor) => <span className="cursor-chip" key={cursor.id}><i style={{background:cursor.color}}/>{cursor.name}</span>)}</div>
