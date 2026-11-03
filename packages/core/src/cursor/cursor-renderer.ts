@@ -223,6 +223,10 @@ export class CursorRenderer {
     const owner = this.dragLocks.get(element);
     if (owner && owner !== id) throw new Error("Drag target is already being dragged by cursor: " + owner);
     this.stopDrag(id);
+    this.naturalMovement.cancel(id);
+    this.cancelRendererTween(id);
+    this.clickTimelines.get(id)?.kill();
+    this.clickTimelines.delete(id);
 
     const containerRect = this.container.getBoundingClientRect();
     const targetRect = element.getBoundingClientRect();
