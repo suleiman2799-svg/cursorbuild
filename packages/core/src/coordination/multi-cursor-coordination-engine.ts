@@ -118,10 +118,13 @@ export class CoordinatedActionGroup {
     validateDelay(options.delay ?? 0, "group delay");
     for (const timeline of timelines) {
       if (!(timeline instanceof CursorActionTimeline)) throw new TypeError("Groups accept CursorActionTimeline instances.");
-      for (const definition of timeline.actions) {
+      timeline.actions.forEach((definition, index) => {
         if (this.actions.has(definition.id)) throw new Error("Duplicate action id in coordination group: " + definition.id);
-        this.actions.set(definition.id, { definition, cursorId: timeline.cursorId, status: "pending" });
-      }
+        const withTimelineDelay = index === 0 && timeline.delay > 0
+          ? { ...definition, delay: (definition.delay ?? 0) + timeline.delay }
+          : definition;
+        this.actions.set(definition.id, { definition: withTimelineDelay, cursorId: timeline.cursorId, status: "pending" });
+      });
     }
     this.validateDependencies();
   }
@@ -172,9 +175,12 @@ export class CoordinatedActionGroup {
       const results = await Promise.allSettled(jobs);
       const rejected = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
       if (rejected) {
-        this.failure = rejected.reason;
-        this.cancel();
-        throw rejected.reason;
+        if (this.failure !== undefined) {
+          this.groupStatus = "failed";
+          throw this.failure;
+        }
+        this.groupStatus = "cancelled";
+        return;
       }
       if (this.groupController.signal.aborted || [...this.actions.values()].some((action) => action.status === "cancelled")) {
         this.groupStatus = "cancelled";
@@ -182,6 +188,10 @@ export class CoordinatedActionGroup {
       }
       this.groupStatus = "completed";
     } catch (error) {
+      if (this.failure !== undefined) {
+        this.groupStatus = "failed";
+        throw this.failure;
+      }
       if (this.groupController.signal.aborted || (error as { name?: string })?.name === "AbortError") {
         this.groupStatus = "cancelled";
         return;
@@ -228,7 +238,13 @@ export class CoordinatedActionGroup {
         }
         if (action.status === "failed") {
           this.failure = error;
-          this.cancel();
+          this.groupController.abort();
+          this.actions.forEach((sibling) => {
+            if (sibling.status === "pending" || sibling.status === "running") {
+              sibling.status = "cancelled";
+              sibling.controller?.abort();
+            }
+          });
         }
         throw error;
       }
