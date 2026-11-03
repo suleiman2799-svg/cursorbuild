@@ -162,6 +162,7 @@ export class CursorRenderer {
     if (!this.nodes.has(id)) throw new Error("Unknown rendered cursor: " + id);
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new TypeError("Cursor coordinates must be finite numbers.");
     if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Movement duration must be finite and non-negative.");
+    this.stopTextInsertion(id);
     this.naturalMovement.cancel(id);
     this.positions.set(id, { ...point });
     const node = this.nodes.get(id)!.element;
@@ -172,10 +173,10 @@ export class CursorRenderer {
   }
 
   moveNaturally(id: string, point: CursorPoint, options: NaturalMoveOptions = {}): gsap.core.Timeline | undefined {
-    this.assertActive(); this.cancelRendererTween(id); return this.naturalMovement.moveTo(id, point, options);
+    this.assertActive(); this.stopTextInsertion(id); this.cancelRendererTween(id); return this.naturalMovement.moveTo(id, point, options);
   }
   moveSequence(id: string, steps: NaturalMovementStep[], options: NaturalMovementOptions = {}): gsap.core.Timeline | undefined {
-    this.assertActive(); this.cancelRendererTween(id); return this.naturalMovement.playSequence(id, steps, options);
+    this.assertActive(); this.stopTextInsertion(id); this.cancelRendererTween(id); return this.naturalMovement.playSequence(id, steps, options);
   }
   stopNaturalMovement(id: string): void { this.assertActive(); this.naturalMovement.cancel(id); }
 
@@ -351,6 +352,7 @@ export class CursorRenderer {
     const delay = options.initialDelay ?? 0.12;
     const curvature = options.curvature ?? 0.12;
     const mode = options.mode ?? "replace";
+    const characters = Array.from(options.text);
     if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Typing duration must be finite and non-negative.");
     if (interval !== undefined && (!Number.isFinite(interval) || interval < 0)) throw new RangeError("characterIntervalMs must be finite and non-negative.");
     if (!Number.isFinite(delay) || delay < 0) throw new RangeError("initialDelay must be finite and non-negative.");
@@ -393,7 +395,7 @@ export class CursorRenderer {
     caret.setAttribute("aria-hidden", "true");
     caret.style.backgroundColor = this.nodes.get(id)!.color;
     this.overlay.appendChild(caret);
-    const typingDuration = interval === undefined ? duration : (interval * options.text.length) / 1000;
+    const typingDuration = interval === undefined ? duration : (interval * characters.length) / 1000;
     const startCursor = this.getPosition(id);
     if (!startCursor) throw new Error("Cursor has no starting position: " + id);
     const rect = element.getBoundingClientRect();
@@ -414,14 +416,14 @@ export class CursorRenderer {
     this.activeTextInsertions.set(id, record);
 
     const updateText = (count: number) => {
-      const value = baseText + options.text.slice(0, count);
+      const value = baseText + characters.slice(0, count).join("");
       if (isInput) element.value = value;
       else if (textNode) textNode.data = options.text.slice(0, count);
       this.positionTypingCaret(id, record, value);
     };
-    if (this.reducedMotion || options.text.length === 0 || (typingDuration === 0 && delay === 0)) {
+    if (this.reducedMotion || characters.length === 0 || (typingDuration === 0 && delay === 0)) {
       element.focus();
-      updateText(options.text.length);
+      updateText(characters.length);
       this.setNaturalPosition(id, this.positionForTypingCaret(record, baseText + options.text));
       this.finishTextInsertion(id, record);
       return undefined;
@@ -450,12 +452,12 @@ export class CursorRenderer {
         }
         const elapsed = progress.value * totalTime;
         const typingProgress = typingDuration <= 0 ? (elapsed >= delay ? 1 : 0) : Math.max(0, Math.min(1, (elapsed - delay) / typingDuration));
-        updateText(Math.min(options.text.length, Math.floor(typingProgress * options.text.length + 1e-8)));
+        updateText(Math.min(characters.length, Math.floor(typingProgress * characters.length + 1e-8)));
       }
     });
     timeline.eventCallback("onComplete", () => {
       if (this.activeTextInsertions.get(id) !== record) return;
-      updateText(options.text.length);
+      updateText(characters.length);
       this.setNaturalPosition(id, this.positionForTypingCaret(record, baseText + options.text));
       this.finishTextInsertion(id, record);
     });
