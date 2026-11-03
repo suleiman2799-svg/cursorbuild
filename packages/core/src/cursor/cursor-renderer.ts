@@ -556,8 +556,13 @@ export class CursorRenderer {
       : Math.max(0, (element.offsetHeight || rect.height) - (computed.boxSizing === "border-box" ? 0 : extraH));
     const startBoxWidth = computed.boxSizing === "border-box" ? startCssWidth : startCssWidth + extraW;
     const startBoxHeight = computed.boxSizing === "border-box" ? startCssHeight : startCssHeight + extraH;
-    const cssW = computed.boxSizing === "border-box" ? options.to.width : Math.max(0,options.to.width-extraW);
-    const cssH = computed.boxSizing === "border-box" ? options.to.height : Math.max(0,options.to.height-extraH);
+    // Edge handles resize only their own axis; corner handles resize both.
+    const resizeWidth = handle.includes("left") || handle.includes("right");
+    const resizeHeight = handle.includes("top") || handle.includes("bottom");
+    const targetBoxWidth = resizeWidth ? options.to.width : startBoxWidth;
+    const targetBoxHeight = resizeHeight ? options.to.height : startBoxHeight;
+    const cssW = computed.boxSizing === "border-box" ? targetBoxWidth : Math.max(0,targetBoxWidth-extraW);
+    const cssH = computed.boxSizing === "border-box" ? targetBoxHeight : Math.max(0,targetBoxHeight-extraH);
     const originalWidth = element.style.width, originalHeight = element.style.height;
     const originalTranslate = element.style.translate;
     const computedTranslate = originalTranslate || computed.translate;
@@ -572,8 +577,8 @@ export class CursorRenderer {
       const dy = handle.includes("top") ? startBoxHeight - height : 0;
       element.style.translate = dx === 0 && dy === 0 ? originalTranslate : composeTranslate(dx, dy);
     };
-    const targetOffsetX = handle.includes("left") ? startBoxWidth - options.to.width : 0;
-    const targetOffsetY = handle.includes("top") ? startBoxHeight - options.to.height : 0;
+    const targetOffsetX = handle.includes("left") ? startBoxWidth - targetBoxWidth : 0;
+    const targetOffsetY = handle.includes("top") ? startBoxHeight - targetBoxHeight : 0;
     const cssTargetTranslate = targetOffsetX === 0 && targetOffsetY === 0
       ? originalTranslate
       : composeTranslate(targetOffsetX, targetOffsetY);
@@ -609,7 +614,7 @@ export class CursorRenderer {
     };
     if(this.reducedMotion || duration===0){
       element.style.width=cssW+"px";element.style.height=cssH+"px";
-      setAnchorOffset(options.to.width,options.to.height);
+      setAnchorOffset(targetBoxWidth,targetBoxHeight);
       updateFrame();this.setNaturalPosition(id,handlePoint());this.finishResizeRecord(id,record);return undefined;
     }
     timeline.to(approach,{value:1,duration:duration*0.3,ease:"power2.inOut",onUpdate:()=>{
@@ -624,8 +629,8 @@ export class CursorRenderer {
       },
       onUpdate:()=>{
         if(this.activeResizes.get(id)!==record || removed())return;
-        const w=startBoxWidth+(options.to.width-startBoxWidth)*progress.value;
-        const h=startBoxHeight+(options.to.height-startBoxHeight)*progress.value;
+        const w=startBoxWidth+(targetBoxWidth-startBoxWidth)*progress.value;
+        const h=startBoxHeight+(targetBoxHeight-startBoxHeight)*progress.value;
         element.style.width=(startCssWidth+(cssW-startCssWidth)*progress.value)+"px";
         element.style.height=(startCssHeight+(cssH-startCssHeight)*progress.value)+"px";
         setAnchorOffset(w,h);
