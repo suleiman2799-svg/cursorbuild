@@ -21,7 +21,7 @@
 
 ## Interaction primitives
 - [x] Configurable drag/drop simulation with per-cursor timelines and element locking
-- [ ] Element resizing and positioning
+- [ ] Element resizing and positioning (implementation is under review in PR #6)
 - [x] Animated text insertion simulation with caret feedback and target locking
 
 ## Orchestration
@@ -34,3 +34,22 @@
 - [ ] API reference and integration examples
 - [ ] Accessibility and performance benchmarks
 - [ ] Release automation
+
+## Cinematic animation engine — implemented in PR #7
+- [x] Directional text, image, and clip-mask reveals
+- [x] Configurable section entrance and element assembly animations
+- [x] Axis-based parallax tweens and arbitrary smooth transitions
+- [x] Staggered multi-element timelines
+- [x] Configurable duration, easing, delay, and stagger
+- [x] Reversible GSAP timelines and explicit lifecycle cleanup
+- [x] Reduced-motion immediate completion and active-animation settlement
+- [x] Standalone framework-independent API and engine-owned instance
+- [x] Responsive demo showcase
+
+## Remaining milestones
+- [ ] Scroll-driven construction scenes
+- [ ] Multi-cursor coordination
+- [ ] Advanced configurable visual effects
+- [ ] Responsive/performance profiling and browser-level validation
+- [ ] Reusable presets, complete developer docs, playground, and integration examples
+- [ ] Release readiness (no package publication without explicit approval)
