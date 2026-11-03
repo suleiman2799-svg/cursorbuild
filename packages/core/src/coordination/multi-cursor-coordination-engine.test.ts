@@ -74,6 +74,32 @@ describe("MultiCursorCoordinationEngine", () => {
     expect(group.status).toBe("cancelled");
   });
 
+  it("keeps an in-flight action cancelled when its callback settles after cancellation", async () => {
+    engine = new MultiCursorCoordinationEngine();
+    let release!: () => void;
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    let receivedSignal!: AbortSignal;
+    const track = engine.createTimeline("maya", [{
+      id: "slow",
+      run: async ({ signal }) => {
+        receivedSignal = signal;
+        markStarted();
+        await blocked;
+      }
+    }], { mode: "parallel" });
+    const group = engine.createGroup("late-settlement-cancel", [track]);
+    const promise = group.run();
+    await started;
+    group.cancelAction("slow");
+    expect(receivedSignal.aborted).toBe(true);
+    release();
+    await promise;
+    expect(group.getActionStatus("slow")).toBe("cancelled");
+    expect(group.status).toBe("cancelled");
+  });
+
   it("cancels the entire group and propagates abort signals", async () => {
     engine = new MultiCursorCoordinationEngine();
     let observed = false;
