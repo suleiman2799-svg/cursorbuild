@@ -2,7 +2,7 @@
 
 **CursorBuild** is an open-source, modular foundation for scroll-driven, multi-cursor website construction animations.
 
-> **Status: early development (v0.7.0).** The foundation, multiple-cursor rendering, natural movement, click feedback, drag/drop, text insertion, and multi-cursor action coordination are implemented. The cinematic engine, scroll construction, and element resizing are in open review PRs #7, #8, and #6 respectively.
+> **Status: early development (v0.7.0).** The foundation, multiple-cursor rendering, natural movement, click feedback, drag/drop, text insertion, and multi-cursor action coordination are implemented. The cinematic engine, scroll construction, and element resizing are in open review PRs #7, #9, and #6 respectively.
 
 ## Technology stack
 - **TypeScript** — framework-agnostic core
