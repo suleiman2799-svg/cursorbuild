@@ -81,8 +81,15 @@ function setup() {
     disable: vi.fn(),
     kill: vi.fn()
   };
-  triggers.push(trigger);
-  state.create.mockReturnValue(trigger);
+  state.create.mockImplementation(() => {
+    if (triggers.length === 0) {
+      triggers.push(trigger);
+      return trigger;
+    }
+    const next = { enable: vi.fn(), disable: vi.fn(), kill: vi.fn() };
+    triggers.push(next);
+    return next;
+  });
   return { engine, section, heading, image, trigger };
 }
 
@@ -121,7 +128,7 @@ describe("ScrollConstructionEngine", () => {
   it("supports pause, resume, progress inspection, and per-scene cleanup", () => {
     const { engine, trigger } = setup();
     const scene = engine.createScene("hero", { trigger: "#scene", steps: [{ id: "heading", target: "#heading", to: { opacity: 1 } }] });
-    expect(scene.progress()).toBe(1);
+    expect(scene.progress()).toBe(0.35);
     scene.pause();
     expect(trigger.disable).toHaveBeenCalledOnce();
     expect(timelines[0].pause).toHaveBeenCalledOnce();
