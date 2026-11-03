@@ -43,7 +43,7 @@ interface SceneRecord {
   trigger?: ScrollTriggerInstance;
   scrub: boolean | number;
   settled: boolean;
-  handle: ScrollConstructionScene;
+  handle?: ScrollConstructionScene;
 }
 
 let pluginRegistered = false;
@@ -116,7 +116,7 @@ export class ScrollConstructionEngine {
       timeline,
       scrub,
       settled: false
-    } as SceneRecord;
+    };
     const handle: ScrollConstructionScene = {
       id,
       timeline,
