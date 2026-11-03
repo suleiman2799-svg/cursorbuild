@@ -119,3 +119,101 @@ describe("CursorRenderer responsive behaviour", () => {
     renderer.destroy();
   });
 });
+
+describe("CursorRenderer drag simulation", () => {
+  function addCard(host: HTMLElement, id = "card") {
+    const card = document.createElement("article");
+    card.id = id;
+    card.style.transform = "rotate(3deg)";
+    card.style.translate = "12px 4px";
+    host.append(card);
+    return card;
+  }
+  it("approaches and starts a selector-based drag with an independent timeline", () => {
+    const { host, renderer } = setup(["a"]);
+    addCard(host);
+    const timeline = renderer.drag("a", { target: "#card", to: { x: 420, y: 260 }, duration: 1.2 });
+    expect(timeline).toBeDefined();
+    expect(renderer.isDragging("a")).toBe(true);
+    expect(gsapState.timelines).toHaveLength(1);
+    expect(gsapState.timelines[0].to).toHaveBeenCalledTimes(3);
+  });
+  it("accepts an HTMLElement target and preserves its original transform", () => {
+    const { host, renderer } = setup(["a"]);
+    const card = addCard(host);
+    renderer.drag("a", { target: card, to: { x: 100, y: 80 } });
+    expect(card.style.transform).toBe("rotate(3deg)");
+    expect(renderer.isDragging("a")).toBe(true);
+  });
+  it("prevents a second cursor from acquiring an already locked element", () => {
+    const { host, renderer } = setup(["a", "b"]);
+    addCard(host);
+    renderer.drag("a", { target: "#card", to: { x: 100, y: 100 } });
+    expect(() => renderer.drag("b", { target: "#card", to: { x: 200, y: 100 } })).toThrow(/already being dragged/);
+    expect(renderer.isDragging("a")).toBe(true);
+    expect(renderer.isDragging("b")).toBe(false);
+  });
+  it("allows different cursors to drag different elements concurrently", () => {
+    const { host, renderer } = setup(["a", "b"]);
+    addCard(host, "one"); addCard(host, "two");
+    renderer.drag("a", { target: "#one", to: { x: 100, y: 100 } });
+    renderer.drag("b", { target: "#two", to: { x: 200, y: 100 } });
+    expect(renderer.isDragging("a")).toBe(true);
+    expect(renderer.isDragging("b")).toBe(true);
+    expect(gsapState.timelines).toHaveLength(2);
+  });
+  it("cancels a drag and restores the target's original inline translate", () => {
+    const { host, renderer } = setup(["a"]);
+    const card = addCard(host);
+    renderer.drag("a", { target: card, to: { x: 100, y: 100 } });
+    renderer.stopDrag("a");
+    expect(renderer.isDragging("a")).toBe(false);
+    expect(card.style.translate).toBe("12px 4px");
+    expect(card.style.transform).toBe("rotate(3deg)");
+    expect(card.hasAttribute("data-cursorbuild-dragging")).toBe(false);
+  });
+  it("releases locks when a target is removed", () => {
+    const { host, renderer } = setup(["a", "b"]);
+    const card = addCard(host);
+    renderer.drag("a", { target: card, to: { x: 100, y: 100 } });
+    card.remove();
+    expect(renderer.isDragging("a")).toBe(false);
+    expect(() => renderer.drag("b", { target: card, to: { x: 100, y: 100 } })).toThrow(/contained/);
+  });
+  it("cancels an active drag when its cursor is removed", () => {
+    const { manager, host, renderer } = setup(["a"]);
+    const card = addCard(host);
+    renderer.drag("a", { target: card, to: { x: 100, y: 100 } });
+    manager.remove("a");
+    expect(renderer.isDragging("a")).toBe(false);
+    expect(card.style.translate).toBe("12px 4px");
+  });
+  it("cancels all active drags and restores styles on renderer destruction", () => {
+    const { host, renderer } = setup(["a", "b"]);
+    const one = addCard(host, "one"), two = addCard(host, "two");
+    renderer.drag("a", { target: one, to: { x: 100, y: 100 } });
+    renderer.drag("b", { target: two, to: { x: 200, y: 100 } });
+    renderer.destroy();
+    expect(one.style.translate).toBe("12px 4px");
+    expect(two.style.translate).toBe("12px 4px");
+  });
+  it("snaps to the destination without an animation when reduced motion is active", () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as typeof window.matchMedia;
+    const { host, renderer } = setup(["a"]);
+    const card = addCard(host);
+    expect(renderer.drag("a", { target: card, to: { x: 100, y: 80 } })).toBeUndefined();
+    expect(renderer.isDragging("a")).toBe(false);
+    expect(gsapState.timelines).toHaveLength(0);
+    window.matchMedia = original;
+  });
+  it("validates drag coordinates, options, selectors, and unknown cursors", () => {
+    const { host, renderer } = setup(["a"]);
+    addCard(host);
+    expect(() => renderer.drag("missing", { target: "#card", to: { x: 1, y: 2 } })).toThrow(/Unknown rendered cursor/);
+    expect(() => renderer.drag("a", { target: "#card", to: { x: Number.NaN, y: 2 } })).toThrow(TypeError);
+    expect(() => renderer.drag("a", { target: "#card", to: { x: 1, y: 2 }, curvature: 2 })).toThrow(RangeError);
+    expect(() => renderer.drag("a", { target: "[", to: { x: 1, y: 2 } })).toThrow(/valid CSS selector/);
+    expect(() => renderer.drag("a", { target: document.createElement("div"), to: { x: 1, y: 2 } })).toThrow(/contained/);
+  });
+});
