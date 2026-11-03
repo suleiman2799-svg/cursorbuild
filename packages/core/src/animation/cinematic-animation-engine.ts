@@ -100,9 +100,9 @@ export class CinematicAnimationEngine {
   /** Bring a section or element into view using configurable entrance values. */
   enterSection(target: CinematicTarget, options: CinematicEntranceOptions = {}): gsap.core.Timeline | undefined {
     return this.transition(target, {
+      ...options,
       from: { y: 36, opacity: 0, ...(options.from ?? {}) },
-      to: { y: 0, opacity: 1, ...(options.to ?? {}) },
-      ...options
+      to: { y: 0, opacity: 1, ...(options.to ?? {}) }
     });
   }
 
@@ -132,9 +132,9 @@ export class CinematicAnimationEngine {
   /** Assemble elements from a configurable starting state into their final layout. */
   assemble(target: CinematicTarget, options: CinematicEntranceOptions = {}): gsap.core.Timeline | undefined {
     return this.transition(target, {
+      ...options,
       from: { opacity: 0, y: 24, scale: 0.94, ...(options.from ?? {}) },
-      to: { opacity: 1, y: 0, scale: 1, ...(options.to ?? {}) },
-      ...options
+      to: { opacity: 1, y: 0, scale: 1, ...(options.to ?? {}) }
     });
   }
 
