@@ -12,7 +12,8 @@ export default function App() {
  const cursors = useCursors();
  const engine = useCursorBuild();
  const stageRef = useRef<HTMLDivElement>(null);
- const rendererRef = useRef<ReturnType<typeof engine.mountCursors> | null>(null);\n const demoTimelineRef = useRef<{ pause: () => void } | null>(null);
+ const rendererRef = useRef<ReturnType<typeof engine.mountCursors> | null>(null);
+ const demoTimelineRef = useRef<{ pause: () => void } | null>(null);
  const [nextId, setNextId] = useState(1);
  useEffect(() => {
   const stage = stageRef.current; if (!stage) return;
@@ -24,7 +25,8 @@ export default function App() {
    initialPositions: { maya: pointAt(0.08, 0.18), noah: pointAt(0.48, 0.32), zoe: pointAt(0.72, 0.14) }
   });
   rendererRef.current = renderer;
-  const timeline = engine.animations.createTimeline("demo-cursor-loop", { repeat: -1, repeatDelay: 0.25 });\n  demoTimelineRef.current = timeline;
+  const timeline = engine.animations.createTimeline("demo-cursor-loop", { repeat: -1, repeatDelay: 0.25 });
+  demoTimelineRef.current = timeline;
   timeline.call(() => renderer.moveNaturally("maya", pointAt(0.28, 0.4)));
   timeline.call(() => renderer.click("maya"), [], "+=0.7");
   timeline.call(() => renderer.moveNaturally("noah", pointAt(0.65, 0.58)));
