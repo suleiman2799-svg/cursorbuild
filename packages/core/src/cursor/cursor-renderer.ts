@@ -188,8 +188,11 @@ export class CursorRenderer {
   private updateVisibility(): void {
     const width = window.innerWidth;
     const limit = width <= 600 ? this.options.mobileMaxVisible : width <= 900 ? this.options.tabletMaxVisible : this.options.maxVisible;
-    [...this.nodes.entries()].forEach(([, cursor], index) => {
-      cursor.element.style.display = index < limit ? "flex" : "none";
+    const entries = [...this.nodes.entries()];
+    const visibleIds = new Set(entries.slice(Math.max(0, entries.length - limit)).map(([id]) => id));
+    entries.forEach(([id, cursor]) => {
+      const display = visibleIds.has(id) ? "flex" : "none";
+      if (cursor.element.style.display !== display) cursor.element.style.display = display;
     });
   }
 }
