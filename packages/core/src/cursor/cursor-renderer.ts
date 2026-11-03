@@ -153,6 +153,7 @@ export class CursorRenderer {
     if (this.destroyed) return;
     this.destroyed = true;
     this.unsubscribe();
+    this.naturalMovement.destroy();
     this.mediaQuery?.removeEventListener?.("change", this.handleMotionChange);
     window.removeEventListener("resize", this.handleResize);
     this.tweens.forEach((tween) => tween.kill());
@@ -166,6 +167,7 @@ export class CursorRenderer {
   private readonly handleMotionChange = (event: MediaQueryListEvent): void => {
     this.reducedMotion = this.options.respectReducedMotion && event.matches;
     if (this.reducedMotion) {
+      this.naturalMovement.finishAll();
       this.tweens.forEach((tween) => tween.kill()); this.tweens.clear();
       this.positions.forEach((point, id) => { const node = this.nodes.get(id); if (node) gsap.set(node.element, { x: point.x, y: point.y }); });
       this.pulses.forEach((timeline) => timeline.kill()); this.pulses.clear();
@@ -229,6 +231,7 @@ export class CursorRenderer {
   }
 
   private removeNode(id: string): void {
+    this.naturalMovement.cancel(id);
     this.tweens.get(id)?.kill(); this.tweens.delete(id);
     this.pulses.get(id)?.kill(); this.pulses.delete(id);
     const cursor = this.nodes.get(id);
