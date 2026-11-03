@@ -6,4 +6,5 @@ export * from "./cursor/cursor-renderer.js";
 export * from "./cursor/natural-cursor-movement.js";
 export * from "./animation/animation-manager.js";
 export * from "./scroll/scroll-manager.js";
+export * from "./scroll/scroll-construction-engine.js";
 export * from "./sequence/action-sequence.js";
