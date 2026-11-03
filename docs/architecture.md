@@ -36,9 +36,15 @@ CursorRenderer.click(id, options?) preserves the original one-argument API and a
 
 The press animation scales the existing SVG pointer down and back to its resting size. The ripple animates the existing halo element's scale and opacity. Both are composed on one GSAP timeline per cursor; separate cursors can animate simultaneously, while repeated clicks on the same cursor replace only that cursor's previous timeline. Completed timelines are removed from the renderer's active map. Removing a cursor, enabling reduced motion, or destroying the renderer kills active timelines and resets visual transforms.
 
+## Scroll-driven construction scenes
+
+ScrollConstructionEngine is exposed as engine.construction and owns independent ScrollConstructionScene instances. Each scene builds a paused GSAP timeline through a developer-supplied callback and creates a ScrollTrigger for a caller-selected section or selector. The trigger's normalized progress seeks the timeline directly, supporting sequential and simultaneous animation through normal GSAP timeline positioning. Scenes can be paused, resumed at the current trigger position, refreshed, and destroyed individually; engine destruction disposes every scene. Reverse playback is enabled by default and can be disabled per scene so progress only advances.
+
+The construction engine is independent of CursorRenderer. It does not create cursors or prescribe what elements a scene animates; developers may animate arbitrary DOM targets or compose their own cursor calls in GSAP callbacks. Multiple scenes maintain separate triggers and timelines.
+
 ## Extension approach
 
-Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport, real collaboration networking, drag/drop, resizing, text insertion, and construction-scene authoring are future modules, not part of the current renderer.
+Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport and real collaboration networking remain future modules. Scroll construction is managed by its own engine rather than being coupled to the cursor renderer.
 
 ## Drag-and-drop simulation
 
