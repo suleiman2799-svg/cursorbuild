@@ -6,3 +6,7 @@
 .cursorbuild-cursor__label{display:block;margin:14px 0 0 1px;padding:5px 9px;border:1px solid rgba(255,255,255,.42);border-radius:5px;color:#fff;font:600 10px/1.2 Inter,ui-sans-serif,system-ui,sans-serif;letter-spacing:.01em;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.22);text-shadow:0 1px 1px rgba(0,0,0,.12);}
 @media(prefers-reduced-motion:reduce){.cursorbuild-cursor__halo{display:none;}}
 [data-cursorbuild-dragging]{outline:2px solid color-mix(in srgb,var(--cursorbuild-color,#8b5cf6) 75%,white);outline-offset:3px;box-shadow:0 16px 38px rgba(0,0,0,.24);z-index:2;}
+
+.cursorbuild-typing-caret{position:absolute;display:block;width:2px;min-height:1em;pointer-events:none;z-index:4;opacity:1;transform:translateX(-1px);animation:cursorbuild-caret-blink 1s steps(2,start) infinite;box-shadow:0 0 7px currentColor}
+@keyframes cursorbuild-caret-blink{to{opacity:0}}
+@media(prefers-reduced-motion:reduce){.cursorbuild-typing-caret{animation:none}}
