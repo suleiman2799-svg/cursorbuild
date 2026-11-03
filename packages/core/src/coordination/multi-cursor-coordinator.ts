@@ -101,8 +101,10 @@ export class MultiCursorCoordinator {
   cancelAction(actionId: string): boolean {
     const active = this.activeActions.get(actionId);
     if (!active) return false;
-    active.controller.abort();
-    active.animation?.kill();
+    if (!active.controller.signal.aborted) {
+      active.controller.abort();
+      active.animation?.kill();
+    }
     return true;
   }
 
