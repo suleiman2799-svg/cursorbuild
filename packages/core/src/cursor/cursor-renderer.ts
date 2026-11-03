@@ -281,12 +281,9 @@ export class CursorRenderer {
       value: 1, duration: approachDuration, ease: "power2.inOut",
       onUpdate: () => setCursor(approachPoint(approach.value))
     });
-    timeline.to({}, {
-      duration: 0.08,
-      onStart: () => { if (this.activeDrags.get(id) === record) { element.setAttribute("data-cursorbuild-dragging", ""); if (pointer) gsap.to(pointer, { scale: grabScale, duration: 0.12, transformOrigin: "3px 3px" }); } }
-    });
     timeline.to(progress, {
       value: 1, duration: dragDuration, ease: "power2.inOut",
+      onStart: () => { if (this.activeDrags.get(id) === record) { element.setAttribute("data-cursorbuild-dragging", ""); if (pointer) gsap.to(pointer, { scale: grabScale, duration: 0.12, transformOrigin: "3px 3px" }); } },
       onUpdate: () => {
         if (this.activeDrags.get(id) !== record || !element.isConnected || !this.container.contains(element)) {
           this.cancelDragRecord(id, record); return;
