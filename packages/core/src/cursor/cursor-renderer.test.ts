@@ -530,8 +530,8 @@ describe("CursorRenderer element resizing simulation", () => {
         if (anchor === "left" || anchor === "right") {
           expect(current.top).toBeCloseTo(initial.top, 5);
           expect(current.bottom).toBeCloseTo(initial.bottom, 5);
-          expect(anchor === "left" ? current.right : current.left)
-            .toBeCloseTo(anchor === "left" ? initial.right : initial.left, 5);
+          expect(anchor === "right" ? current.right : current.left)
+            .toBeCloseTo(anchor === "right" ? initial.right : initial.left, 5);
         }
       }
 
