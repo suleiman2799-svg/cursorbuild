@@ -441,8 +441,14 @@ describe("CursorRenderer element resizing simulation", () => {
     const { host, renderer } = setup(["a"]);
     const target = addResizeTarget(host);
     target.style.translate = "12px 4px";
+    target.style.position = "absolute";
+    target.style.left = "18px";
+    target.style.top = "26px";
     renderer.resize("a", { target, to: { width: 240, height: 170 }, handle: "top-left" });
     renderer.stopResize("a");
+    expect(target.style.position).toBe("absolute");
+    expect(target.style.left).toBe("18px");
+    expect(target.style.top).toBe("26px");
     expect(target.style.width).toBe("100px");
     expect(target.style.height).toBe("80px");
     expect(target.style.translate).toBe("12px 4px");
