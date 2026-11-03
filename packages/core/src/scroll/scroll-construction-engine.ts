@@ -43,6 +43,7 @@ export class ScrollConstructionScene {
         this.applyProgress(next);
       }
     });
+    this.applyProgress(this.triggerInstance.progress);
   }
 
   /** Current normalized scroll progress, from 0 to 1. */
