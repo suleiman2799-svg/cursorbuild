@@ -75,6 +75,17 @@ export class CursorRenderer {
     });
     container.appendChild(this.overlay);
 
+    this.naturalMovement = new NaturalCursorMovementEngine({
+      hasCursor: (id) => this.nodes.has(id),
+      getPosition: (id) => this.getPosition(id),
+      setPosition: (id, point) => this.setNaturalPosition(id, point),
+      isReducedMotion: () => this.reducedMotion
+    }, {
+      duration: this.options.duration,
+      ease: this.options.ease,
+      ...options.naturalMovement
+    });
+
     this.unsubscribe = manager.subscribe(() => this.sync());
     this.mediaQuery?.addEventListener?.("change", this.handleMotionChange);
     window.addEventListener("resize", this.handleResize, { passive: true });
