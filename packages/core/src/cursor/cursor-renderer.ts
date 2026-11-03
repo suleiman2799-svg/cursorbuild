@@ -45,6 +45,7 @@ export interface CursorRendererOptions {
 interface CursorNode { element: HTMLDivElement; label: HTMLSpanElement; color: string; name: string; }
 interface DragRecord {
   element: HTMLElement;
+  startElement: CursorPoint;
   timeline: gsap.core.Timeline;
   originalTranslate: string;
   baseTranslateX: string;
@@ -239,7 +240,7 @@ export class CursorRenderer {
     const pointer = this.nodes.get(id)!.element.querySelector<SVGElement>(".cursorbuild-cursor__button");
     const timeline = gsap.timeline();
     const record: DragRecord = {
-      element, timeline, originalTranslate, baseTranslateX, baseTranslateY,
+      element, startElement, timeline, originalTranslate, baseTranslateX, baseTranslateY,
       cursorEnd, destination, grabScale
     };
     this.dragLocks.set(element, id);
@@ -327,12 +328,10 @@ export class CursorRenderer {
       this.clickTimelines.forEach((timeline) => timeline.kill()); this.clickTimelines.clear();
       [...this.activeDrags.entries()].forEach(([id, record]) => {
         const pointer = this.nodes.get(id)?.element.querySelector<SVGElement>(".cursorbuild-cursor__button");
+        record.timeline.kill();
         if (record.element.isConnected && this.container.contains(record.element)) {
-          const rect = record.element.getBoundingClientRect();
-          const containerRect = this.container.getBoundingClientRect();
-          const x = rect.left - containerRect.left - this.container.clientLeft + this.container.scrollLeft;
-          const y = rect.top - containerRect.top - this.container.clientTop + this.container.scrollTop;
-          record.element.style.translate = `calc(${record.baseTranslateX} + ${record.destination.x - x}px) calc(${record.baseTranslateY} + ${record.destination.y - y}px)`;
+          record.element.style.translate = `calc(${record.baseTranslateX} + ${record.destination.x - record.startElement.x}px) calc(${record.baseTranslateY} + ${record.destination.y - record.startElement.y}px)`;
+          this.setNaturalPosition(id, record.cursorEnd);
         }
         this.finishDragRecord(id, record, pointer);
       });
