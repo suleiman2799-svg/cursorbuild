@@ -25,7 +25,7 @@
 - [x] Animated text insertion simulation with caret feedback and target locking
 
 ## Orchestration
-- [ ] Declarative timelines and reusable scroll scenes
+- [x] Scroll-driven construction scenes with section timelines, progress, pause/resume, reverse control, and cleanup
 - [ ] Multi-cursor coordination and conflict rules
 - [ ] Responsive scene composition and reduced-motion strategy
 
