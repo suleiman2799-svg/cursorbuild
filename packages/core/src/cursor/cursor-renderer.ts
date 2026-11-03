@@ -527,8 +527,10 @@ export class CursorRenderer {
     if (!RESIZE_HANDLES.includes(handle)) throw new TypeError("Unknown resize handle.");
     const element = typeof options.target === "string" ? this.resolveResizeSelector(options.target) : options.target;
     if (!(element instanceof HTMLElement) || element === this.container || !this.container.contains(element)) throw new Error("Resize target must be an HTMLElement contained by the mounted container.");
-    if (this.dragLocks.has(element)) throw new Error("Target is already being dragged by cursor: " + this.dragLocks.get(element));
-    if (this.textLocks.has(element)) throw new Error("Target is being used by text insertion cursor: " + this.textLocks.get(element));
+    const dragOwner = this.dragLocks.get(element);
+    if (dragOwner && dragOwner !== id) throw new Error("Target is already being dragged by cursor: " + dragOwner);
+    const textOwner = this.textLocks.get(element);
+    if (textOwner && textOwner !== id) throw new Error("Target is being used by text insertion cursor: " + textOwner);
     const owner = this.resizeLocks.get(element);
     if (owner && owner !== id) throw new Error("Target is already being resized by cursor: " + owner);
     this.stopResize(id); this.stopDrag(id); this.stopTextInsertion(id);
