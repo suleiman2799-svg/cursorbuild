@@ -175,7 +175,7 @@ describe("ScrollConstructionEngine", () => {
     const progress = vi.fn();
     const scene = engine.createScene("reduced", { trigger: section, onProgress: progress, steps: [{ id: "final", target, to: { opacity: 1 } }] });
     expect(scene.trigger).toBeUndefined();
-    expect(scene.progress()).toBe(0.35);
+    expect(scene.progress()).toBe(1);
     expect(timelines[0].progress).toHaveBeenCalledWith(1);
     expect(timelines[0].pause).toHaveBeenCalled();
     expect(state.create).not.toHaveBeenCalled();
