@@ -58,3 +58,13 @@ Supported targets are text-like input types (text, search, email, url, tel, pass
 A renderer-level target lock prevents simultaneous cursors from typing into the same element, and a cursor can own only one text insertion at a time. Text insertion cancels that cursor's prior drag/movement and visual click timeline; starting a drag or a new movement also cancels typing. stopTextInsertion() restores the original value or child nodes, kills the typing/focus timelines, releases the target lock, and removes the caret. Target removal is observed; cursor removal and renderer destruction perform the same cleanup. If reduced motion becomes active, the current insertion is completed immediately and its caret is removed.
 
 No synthetic keyboard, beforeinput, or input events are dispatched. Calling focus() can produce normal browser focus behaviour, but value changes are programmatic. Framework-controlled inputs (for example, React controlled inputs) may not update their component state; applications must update their own state separately or use uncontrolled elements. The simulation does not emulate physical keystrokes, IME composition, selection editing, or rich-text formatting.
+
+## Scroll-driven construction engine
+
+ScrollConstructionEngine is owned by CursorBuildEngine as `engine.construction` and can be used without mounting cursors. A scene binds a GSAP timeline to a ScrollTrigger. Its trigger element, start/end boundaries, scrub mode, reverse policy, and progress callback are caller-configurable. Each step targets one or more Elements and contributes a GSAP tween to the scene timeline.
+
+Steps without a position are appended sequentially. A GSAP position such as `<` or a numeric offset lets developers overlap or synchronize steps. This keeps choreography declarative without hardcoding particular cursor identities or page layouts. Cursor simulation and cinematic animations remain separate modules; developers can compose their own actions alongside a scene.
+
+Scrubbed scenes follow scroll progress in both directions. Non-scrubbed scenes use configurable ScrollTrigger toggle actions and can reverse on backward entry. Scene handles expose pause, resume, progress, and kill operations; the engine also exposes lookup and bulk cleanup. Multiple scenes are tracked independently.
+
+The engine respects `prefers-reduced-motion`: new scenes settle at their final timeline state without creating a ScrollTrigger, and active scenes settle and release their trigger when the preference changes to reduce. `destroy()` removes the media-query listener and kills all scene resources. Scene targets are resolved at creation time; dynamically inserted targets should be present before `createScene()` is called.
