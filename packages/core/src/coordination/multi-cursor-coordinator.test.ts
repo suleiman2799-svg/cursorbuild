@@ -68,6 +68,23 @@ describe("MultiCursorCoordinator", () => {
     expect(order).toEqual(["first", "second", "third"]);
   });
 
+  it("staggers parallel collaborator starts by the configured delay", async () => {
+    vi.useFakeTimers();
+    const coordinator = setup();
+    const starts: string[] = [];
+    const done = coordinator.runGroup("staggered", [
+      { id: "first", cursorId: "maya", run: () => { starts.push("first"); } },
+      { id: "second", cursorId: "noah", run: () => { starts.push("second"); } }
+    ], { mode: "parallel", delayBetween: 0.05 });
+    await Promise.resolve();
+    expect(starts).toEqual(["first"]);
+    await vi.advanceTimersByTimeAsync(49);
+    expect(starts).toEqual(["first"]);
+    await vi.advanceTimersByTimeAsync(1);
+    await done;
+    expect(starts).toEqual(["first", "second"]);
+  });
+
   it("honours explicit dependencies and topologically orders actions", async () => {
     const coordinator = setup();
     const order: string[] = [];
