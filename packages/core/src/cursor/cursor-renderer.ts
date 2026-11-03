@@ -137,7 +137,7 @@ export class CursorRenderer {
     gsap.set(halo, { scale: 0.45, opacity: 0 });
     const timeline = gsap.timeline();
     const pressDuration = config.duration * 0.28;
-    const releaseDuration = config.duration * 0.42;
+    const releaseDuration = config.duration * 0.72;
     if (config.style === "press" || config.style === "ripple-press") {
       timeline.to(button, { scale: 0.82, duration: pressDuration, ease: "power2.out" });
       timeline.to(button, { scale: 1, duration: releaseDuration, ease: "back.out(2.2)" });
