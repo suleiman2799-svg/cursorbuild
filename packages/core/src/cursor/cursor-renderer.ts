@@ -613,7 +613,8 @@ export class CursorRenderer {
       return false;
     };
     if(this.reducedMotion || duration===0){
-      element.style.width=cssW+"px";element.style.height=cssH+"px";
+      if(resizeWidth)element.style.width=cssW+"px";
+      if(resizeHeight)element.style.height=cssH+"px";
       setAnchorOffset(targetBoxWidth,targetBoxHeight);
       updateFrame();this.setNaturalPosition(id,handlePoint());this.finishResizeRecord(id,record);return undefined;
     }
@@ -631,15 +632,16 @@ export class CursorRenderer {
         if(this.activeResizes.get(id)!==record || removed())return;
         const w=startBoxWidth+(targetBoxWidth-startBoxWidth)*progress.value;
         const h=startBoxHeight+(targetBoxHeight-startBoxHeight)*progress.value;
-        element.style.width=(startCssWidth+(cssW-startCssWidth)*progress.value)+"px";
-        element.style.height=(startCssHeight+(cssH-startCssHeight)*progress.value)+"px";
+        if(resizeWidth)element.style.width=(startCssWidth+(cssW-startCssWidth)*progress.value)+"px";
+        if(resizeHeight)element.style.height=(startCssHeight+(cssH-startCssHeight)*progress.value)+"px";
         setAnchorOffset(w,h);
         updateFrame();this.setNaturalPosition(id,handlePoint());
       }
     });
     timeline.eventCallback("onComplete",()=>{
       if(this.activeResizes.get(id)!==record)return;
-      element.style.width=cssW+"px";element.style.height=cssH+"px";
+      if(resizeWidth)element.style.width=cssW+"px";
+      if(resizeHeight)element.style.height=cssH+"px";
       element.style.translate=cssTargetTranslate;
       updateFrame();this.setNaturalPosition(id,handlePoint());this.finishResizeRecord(id,record);
     });
@@ -678,7 +680,10 @@ export class CursorRenderer {
   }
   private completeResize(id:string,record:ResizeRecord):void{
     if(this.activeResizes.get(id)!==record)return;
-    record.timeline.kill();record.element.style.width=record.cssTargetWidth+"px";record.element.style.height=record.cssTargetHeight+"px";record.element.style.translate=record.cssTargetTranslate;
+    record.timeline.kill();
+    if(record.handle.includes("left") || record.handle.includes("right"))record.element.style.width=record.cssTargetWidth+"px";
+    if(record.handle.includes("top") || record.handle.includes("bottom"))record.element.style.height=record.cssTargetHeight+"px";
+    record.element.style.translate=record.cssTargetTranslate;
     const r=record.element.getBoundingClientRect(),c=this.container.getBoundingClientRect();
     const ox=c.left+this.container.clientLeft-this.container.scrollLeft,oy=c.top+this.container.clientTop-this.container.scrollTop;
     const x=record.handle.includes("left")?r.left:record.handle.includes("right")?r.right:r.left+r.width/2;
