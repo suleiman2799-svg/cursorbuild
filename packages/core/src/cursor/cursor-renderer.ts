@@ -560,19 +560,18 @@ export class CursorRenderer {
     let x = rect.left + rect.width - 2;
     let y = rect.top + rect.height / 2;
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-      try {
-        const canvas = document.createElement("canvas");
-        const context = canvas.getContext("2d");
-        if (context) {
-          context.font = style.font;
-          const lines = element instanceof HTMLTextAreaElement ? text.split("\n") : [text];
-          const lastLine = lines[lines.length - 1] ?? "";
-          x = rect.left + (Number.parseFloat(style.paddingLeft) || 0) + context.measureText(lastLine).width - element.scrollLeft;
-          y = element instanceof HTMLTextAreaElement
-            ? rect.top + (Number.parseFloat(style.paddingTop) || 0) + (lines.length - 1) * (Number.parseFloat(style.lineHeight) || 18) - element.scrollTop
-            : rect.top + rect.height / 2;
-        }
-      } catch { /* Use the target's trailing edge when canvas text metrics are unavailable. */ }
+      const lines = element instanceof HTMLTextAreaElement ? text.split("\n") : [text];
+      const lastLine = lines[lines.length - 1] ?? "";
+      const measure = document.createElement("span");
+      Object.assign(measure.style, { position: "absolute", visibility: "hidden", whiteSpace: "pre", font: style.font });
+      measure.textContent = lastLine;
+      this.overlay.appendChild(measure);
+      const measuredWidth = measure.getBoundingClientRect().width || lastLine.length * (Number.parseFloat(style.fontSize) || 16) * 0.55;
+      measure.remove();
+      x = rect.left + (Number.parseFloat(style.paddingLeft) || 0) + measuredWidth - element.scrollLeft;
+      y = element instanceof HTMLTextAreaElement
+        ? rect.top + (Number.parseFloat(style.paddingTop) || 0) + (lines.length - 1) * (Number.parseFloat(style.lineHeight) || 18) - element.scrollTop
+        : rect.top + rect.height / 2;
     } else if (record.textNode) {
       try {
         const range = document.createRange();
