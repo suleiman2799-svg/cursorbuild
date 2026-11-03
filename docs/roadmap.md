@@ -22,7 +22,7 @@
 ## Interaction primitives
 - [x] Configurable drag/drop simulation with per-cursor timelines and element locking
 - [ ] Element resizing and positioning
-- [ ] Animated text insertion
+- [x] Animated text insertion simulation with caret feedback and target locking
 
 ## Orchestration
 - [ ] Declarative timelines and reusable scroll scenes
