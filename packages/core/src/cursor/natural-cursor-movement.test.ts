@@ -92,11 +92,13 @@ describe("NaturalCursorMovementEngine", () => {
       { to: { x: 90, y: 60 } }
     ], { duration: 0.8, ease: "power2.inOut", pauseBetween: 0.2 });
     const steps = gsapState.timelines[0].steps;
-    expect(steps).toHaveLength(3);
+    expect(steps).toHaveLength(5);
     expect(steps[0].vars.duration).toBe(0.8);
     expect(steps[0].vars.ease).toBe("power2.inOut");
-    expect(steps[1].vars.duration).toBe(0.4);
+    expect(steps[1].vars.duration).toBe(0.2);
     expect(steps[1].target).toEqual({});
+    expect(steps[3].vars.duration).toBe(0.4);
+    expect(steps[3].target).toEqual({});
     engine.destroy();
   });
 
