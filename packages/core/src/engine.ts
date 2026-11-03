@@ -2,6 +2,7 @@ import { AnimationManager } from "./animation/animation-manager.js";
 import { resolveConfig } from "./config.js";
 import { CursorManager } from "./cursor/cursor-manager.js";
 import { CursorRenderer } from "./cursor/cursor-renderer.js";
+import { MultiCursorCoordinationEngine } from "./coordination/multi-cursor-coordination-engine.js";
 import type { CursorRendererOptions } from "./cursor/cursor-renderer.js";
 import { ScrollManager } from "./scroll/scroll-manager.js";
 import type { CursorBuildConfig } from "./types.js";
@@ -10,6 +11,7 @@ export class CursorBuildEngine {
  readonly cursors = new CursorManager();
  readonly animations = new AnimationManager();
  readonly scroll = new ScrollManager();
+ readonly coordination = new MultiCursorCoordinationEngine();
  private readonly cursorRenderers = new Set<CursorRenderer>();
  private destroyed = false;
  constructor(config: Partial<CursorBuildConfig> = {}) { this.config = resolveConfig(config); }
@@ -27,6 +29,7 @@ export class CursorBuildEngine {
   this.cursorRenderers.forEach((renderer) => renderer.destroy());
   this.cursorRenderers.clear();
   this.animations.killAll();
+  this.coordination.destroy();
   this.scroll.killAll();
  }
 }
