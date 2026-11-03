@@ -2,7 +2,7 @@
 
 **CursorBuild** is an open-source, modular foundation for scroll-driven, multi-cursor website construction animations.
 
-> **Status: early development (v0.3.0).** The foundation, multiple-cursor rendering, natural movement, and configurable visual click feedback are implemented. Drag/drop, resizing, text insertion, and full cinematic construction sequences remain planned.
+> **Status: early development (v0.3.0).** The foundation, multiple-cursor rendering, natural movement, configurable visual click feedback, and drag/drop simulation are implemented. Resizing, text insertion, and full cinematic construction sequences remain planned.
 
 ## Technology stack
 - **TypeScript** — framework-agnostic core
@@ -120,3 +120,24 @@ Issues and pull requests are welcome. Keep the core framework-independent and ad
 ## License
 
 MIT — see LICENSE.
+
+## Drag-and-drop simulation
+
+`drag()` makes a cursor approach an element, visually grab it, and animate it to a new container-relative position. Targets can be CSS selectors or `HTMLElement` references contained by the mounted container:
+
+~~~ts
+renderer.drag("designer", {
+  target: "#design-card",
+  to: { x: 420, y: 260 },
+  duration: 1.2,
+  curvature: 0.18,
+  grabScale: 0.82
+});
+
+renderer.isDragging("designer"); // true while the operation is active
+renderer.stopDrag("designer");   // cancel and restore the original inline translate
+~~~
+
+`duration` defaults to 1.2 seconds; `curvature` defaults to 0.16 (0–1), and `grabScale` defaults to 0.82 (greater than 0 and at most 1). The destination is the element's top-left position relative to the mounted container's content origin. The renderer animates the CSS individual `translate` property, preserving the element's existing `transform`; successful drops retain the new position. Cancellation restores the original inline `translate` value.
+
+Different cursors can drag different elements concurrently. An element is locked to one cursor until release or cancellation. Removed targets, cursor removal, and renderer destruction cancel the operation and release its lock. Reduced-motion mode skips the animation and places the element at its destination immediately. Dragging is a visual simulation only: CursorBuild does not dispatch browser mouse or pointer events, and it does not make arbitrary elements natively draggable.

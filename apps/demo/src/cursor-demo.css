@@ -18,3 +18,8 @@
 .cursor-chip{display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid #393544;border-radius:7px;color:#c9c4d3;font-size:10px}
 .cursor-chip i{width:7px;height:7px;border-radius:50%}
 @media(max-width:600px){.construction-stage{min-height:390px}.stage-content{margin:35px auto;padding:0 17px}.stage-card-row{gap:7px}.stage-card{padding:10px;min-height:76px}.stage-card strong{font-size:9px}.cursor-controls{align-items:flex-start}.cursor-controls button{padding:9px 10px}}
+.drag-card-row{grid-template-columns:repeat(2,minmax(0,1fr));max-width:420px;position:relative;z-index:1}
+.drag-card{min-height:104px;position:relative;transition:box-shadow .2s ease,border-color .2s ease}
+.drag-card small{display:block;margin-top:7px;color:#aaa5b6;font-size:9px}
+.cursor-controls button:last-child{border-color:#7668aa}
+@media(max-width:600px){.drag-card-row{gap:8px}.drag-card{padding:10px;min-height:94px}}

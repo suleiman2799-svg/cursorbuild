@@ -3,6 +3,7 @@ import type { CursorManager } from "./cursor-manager.js";
 import type { CursorIdentity } from "../types.js";
 import { NaturalCursorMovementEngine } from "./natural-cursor-movement.js";
 import type { NaturalMoveOptions, NaturalMovementOptions, NaturalMovementStep } from "./natural-cursor-movement.js";
+import { getNaturalControlPoints } from "./natural-cursor-movement.js";
 
 export interface CursorPoint { x: number; y: number; }
 export type CursorClickStyle = "ripple" | "press" | "ripple-press";
@@ -15,6 +16,19 @@ export interface CursorClickFeedbackOptions {
   intensity?: number;
   /** Render only the ripple, only the button press, or both. */
   style?: CursorClickStyle;
+}
+export type DragTarget = string | HTMLElement;
+export interface CursorDragOptions {
+  /** CSS selector or an element contained by the mounted container. */
+  target: DragTarget;
+  /** Destination top-left coordinate, in container-relative CSS pixels. */
+  to: CursorPoint;
+  /** Total approach + grab + drag duration, in seconds. */
+  duration?: number;
+  /** Curvature of the approach and drag paths (0 = straight, 1 = strong arc). */
+  curvature?: number;
+  /** Cursor pointer compression while the element is grabbed (0–1). */
+  grabScale?: number;
 }
 export interface CursorRendererOptions {
   duration?: number;
@@ -29,10 +43,29 @@ export interface CursorRendererOptions {
   clickFeedback?: CursorClickFeedbackOptions;
 }
 interface CursorNode { element: HTMLDivElement; label: HTMLSpanElement; color: string; name: string; }
+interface DragRecord {
+  element: HTMLElement;
+  startElement: CursorPoint;
+  timeline: gsap.core.Timeline;
+  originalTranslate: string;
+  baseTranslateX: string;
+  baseTranslateY: string;
+  cursorEnd: CursorPoint;
+  destination: CursorPoint;
+  grabScale: number;
+}
 
 const CLICK_DEFAULTS: Required<CursorClickFeedbackOptions> = {
   duration: 0.32, rippleSize: 2.15, intensity: 0.72, style: "ripple-press"
 };
+
+function sampleDragBezier(from: CursorPoint, c1: CursorPoint, c2: CursorPoint, to: CursorPoint, t: number): CursorPoint {
+  const u = 1 - t;
+  return {
+    x: u * u * u * from.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * to.x,
+    y: u * u * u * from.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * to.y
+  };
+}
 
 /** Renders cursor identities into a non-interactive overlay. Coordinates are container-relative CSS pixels. */
 export class CursorRenderer {
@@ -42,6 +75,10 @@ export class CursorRenderer {
   private readonly positions = new Map<string, CursorPoint>();
   private readonly tweens = new Map<string, gsap.core.Tween>();
   private readonly clickTimelines = new Map<string, gsap.core.Timeline>();
+  private readonly dragTimelines = new Map<string, gsap.core.Timeline>();
+  private readonly activeDrags = new Map<string, DragRecord>();
+  private readonly dragLocks = new Map<HTMLElement, string>();
+  private readonly mutationObserver: MutationObserver;
   private readonly unsubscribe: () => void;
   private readonly options: Required<Omit<CursorRendererOptions, "initialPositions" | "naturalMovement" | "clickFeedback">>;
   private readonly initialPositions: Record<string, CursorPoint>;
@@ -89,6 +126,8 @@ export class CursorRenderer {
     }, { duration: this.options.duration, ease: this.options.ease, ...options.naturalMovement });
 
     this.unsubscribe = manager.subscribe(() => this.sync());
+    this.mutationObserver = new MutationObserver(() => this.cancelRemovedDrags());
+    this.mutationObserver.observe(container, { childList: true, subtree: true });
     this.mediaQuery?.addEventListener?.("change", this.handleMotionChange);
     window.addEventListener("resize", this.handleResize, { passive: true });
     this.sync();
@@ -157,12 +196,128 @@ export class CursorRenderer {
     this.clickTimelines.set(id, timeline);
   }
 
+  /**
+   * Approach, visually grab, and move an element. This is a visual DOM
+   * simulation: it never dispatches browser mouse or pointer events.
+   */
+  drag(id: string, options: CursorDragOptions): gsap.core.Timeline | undefined {
+    this.assertActive();
+    if (!this.nodes.has(id)) throw new Error("Unknown rendered cursor: " + id);
+    if (!options || !options.target) throw new TypeError("A drag target is required.");
+    if (!options.to || !Number.isFinite(options.to.x) || !Number.isFinite(options.to.y)) {
+      throw new TypeError("Drag destination coordinates must be finite numbers.");
+    }
+    const duration = options.duration ?? 1.2;
+    const curvature = options.curvature ?? 0.16;
+    const grabScale = options.grabScale ?? 0.82;
+    if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Drag duration must be finite and non-negative.");
+    if (!Number.isFinite(curvature) || curvature < 0 || curvature > 1) throw new RangeError("Drag curvature must be between 0 and 1.");
+    if (!Number.isFinite(grabScale) || grabScale <= 0 || grabScale > 1) throw new RangeError("grabScale must be greater than 0 and at most 1.");
+
+    const element = typeof options.target === "string"
+      ? this.resolveDragSelector(options.target)
+      : options.target;
+    if (!(element instanceof HTMLElement) || element === this.container || !this.container.contains(element)) {
+      throw new Error("Drag target must be an HTMLElement contained by the mounted container.");
+    }
+    const owner = this.dragLocks.get(element);
+    if (owner && owner !== id) throw new Error("Drag target is already being dragged by cursor: " + owner);
+    this.stopDrag(id);
+    this.naturalMovement.cancel(id);
+    this.cancelRendererTween(id);
+    this.clickTimelines.get(id)?.kill();
+    this.clickTimelines.delete(id);
+
+    const containerRect = this.container.getBoundingClientRect();
+    const targetRect = element.getBoundingClientRect();
+    const startElement = {
+      x: targetRect.left - containerRect.left - this.container.clientLeft + this.container.scrollLeft,
+      y: targetRect.top - containerRect.top - this.container.clientTop + this.container.scrollTop
+    };
+    const startCursor = this.getPosition(id);
+    if (!startCursor) throw new Error("Cursor has no starting position: " + id);
+    const targetCenter = { x: startElement.x + targetRect.width / 2, y: startElement.y + targetRect.height / 2 };
+    const destination = { ...options.to };
+    const cursorEnd = { x: destination.x + targetRect.width / 2, y: destination.y + targetRect.height / 2 };
+    const computedTranslate = window.getComputedStyle(element).translate;
+    const [baseTranslateX, baseTranslateY] = computedTranslate && computedTranslate !== "none"
+      ? computedTranslate.split(/\s+/).slice(0, 2)
+      : ["0px", "0px"];
+    const originalTranslate = element.style.translate;
+
+    const approachControls = getNaturalControlPoints(startCursor, targetCenter, curvature, id);
+    const dragControls = getNaturalControlPoints(targetCenter, cursorEnd, curvature, id + ":drag");
+    const pointer = this.nodes.get(id)!.element.querySelector<SVGElement>(".cursorbuild-cursor__button");
+    const setElementOffset = (dx: number, dy: number) => {
+      element.style.translate = `calc(${baseTranslateX} + ${dx}px) calc(${baseTranslateY} + ${dy}px)`;
+    };
+    if (this.reducedMotion || duration === 0) {
+      this.setNaturalPosition(id, cursorEnd);
+      setElementOffset(destination.x - startElement.x, destination.y - startElement.y);
+      if (pointer) gsap.set(pointer, { scale: 1 });
+      return undefined;
+    }
+
+    const approach = { value: 0 };
+    const progress = { value: 0 };
+    const timeline = gsap.timeline();
+    const record: DragRecord = {
+      element, startElement, timeline, originalTranslate, baseTranslateX, baseTranslateY,
+      cursorEnd, destination, grabScale
+    };
+    this.dragLocks.set(element, id);
+    this.activeDrags.set(id, record);
+    this.dragTimelines.set(id, timeline);
+
+    const setCursor = (point: CursorPoint) => {
+      if (!element.isConnected || !this.container.contains(element)) { this.cancelDragRecord(id, record); return; }
+      this.setNaturalPosition(id, point);
+    };
+    const approachPoint = (t: number) => sampleDragBezier(startCursor, approachControls[0], approachControls[1], targetCenter, t);
+    const dragPoint = (t: number) => sampleDragBezier(targetCenter, dragControls[0], dragControls[1], cursorEnd, t);
+    const approachDuration = duration * 0.32;
+    const dragDuration = duration * 0.68;
+    timeline.to(approach, {
+      value: 1, duration: approachDuration, ease: "power2.inOut",
+      onUpdate: () => setCursor(approachPoint(approach.value))
+    });
+    timeline.to(progress, {
+      value: 1, duration: dragDuration, ease: "power2.inOut",
+      onStart: () => { if (this.activeDrags.get(id) === record) { element.setAttribute("data-cursorbuild-dragging", ""); if (pointer) gsap.to(pointer, { scale: grabScale, duration: 0.12, transformOrigin: "3px 3px" }); } },
+      onUpdate: () => {
+        if (this.activeDrags.get(id) !== record || !element.isConnected || !this.container.contains(element)) {
+          this.cancelDragRecord(id, record); return;
+        }
+        const point = dragPoint(progress.value);
+        setCursor(point);
+        setElementOffset((destination.x - startElement.x) * progress.value, (destination.y - startElement.y) * progress.value);
+      }
+    });
+    timeline.eventCallback("onComplete", () => this.finishDragRecord(id, record, pointer));
+    return timeline;
+  }
+
+  /** Cancel a drag and restore the target's original inline translate value. */
+  stopDrag(id: string): void {
+    const record = this.activeDrags.get(id);
+    if (record) this.cancelDragRecord(id, record);
+  }
+
+  /** Whether this cursor currently owns an active drag operation. */
+  isDragging(id: string): boolean {
+    const record = this.activeDrags.get(id);
+    if (record && (!record.element.isConnected || !this.container.contains(record.element))) this.cancelDragRecord(id, record);
+    return this.activeDrags.has(id);
+  }
+
   getPosition(id: string): CursorPoint | undefined { const point = this.positions.get(id); return point ? { ...point } : undefined; }
 
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true; this.unsubscribe(); this.naturalMovement.destroy();
     this.mediaQuery?.removeEventListener?.("change", this.handleMotionChange);
+    this.mutationObserver.disconnect();
+    [...this.activeDrags.entries()].forEach(([id, record]) => this.cancelDragRecord(id, record));
     window.removeEventListener("resize", this.handleResize);
     this.tweens.forEach((tween) => tween.kill());
     this.clickTimelines.forEach((timeline) => timeline.kill());
@@ -179,6 +334,15 @@ export class CursorRenderer {
       this.tweens.forEach((tween) => tween.kill()); this.tweens.clear();
       this.positions.forEach((point, id) => { const node = this.nodes.get(id); if (node) gsap.set(node.element, { x: point.x, y: point.y }); });
       this.clickTimelines.forEach((timeline) => timeline.kill()); this.clickTimelines.clear();
+      [...this.activeDrags.entries()].forEach(([id, record]) => {
+        const pointer = this.nodes.get(id)?.element.querySelector<SVGElement>(".cursorbuild-cursor__button");
+        record.timeline.kill();
+        if (record.element.isConnected && this.container.contains(record.element)) {
+          record.element.style.translate = `calc(${record.baseTranslateX} + ${record.destination.x - record.startElement.x}px) calc(${record.baseTranslateY} + ${record.destination.y - record.startElement.y}px)`;
+          this.setNaturalPosition(id, record.cursorEnd);
+        }
+        this.finishDragRecord(id, record, pointer);
+      });
       this.nodes.forEach(({ element }) => {
         const button = element.querySelector(".cursorbuild-cursor__button");
         const halo = element.querySelector(".cursorbuild-cursor__halo");
@@ -194,6 +358,37 @@ export class CursorRenderer {
     if (!Number.isFinite(options.rippleSize) || options.rippleSize <= 0) throw new RangeError("rippleSize must be finite and greater than zero.");
     if (!Number.isFinite(options.intensity) || options.intensity < 0 || options.intensity > 1) throw new RangeError("intensity must be between 0 and 1.");
     if (!["ripple", "press", "ripple-press"].includes(options.style)) throw new TypeError("Unknown click feedback style.");
+  }
+  private resolveDragSelector(selector: string): HTMLElement {
+    let element: Element | null;
+    try { element = this.container.querySelector(selector); }
+    catch { throw new TypeError("Drag target must be a valid CSS selector."); }
+    if (!(element instanceof HTMLElement)) throw new Error("Drag selector did not match an HTMLElement inside the mounted container.");
+    return element;
+  }
+  private cancelRemovedDrags(): void {
+    [...this.activeDrags.entries()].forEach(([id, record]) => {
+      if (!record.element.isConnected || !this.container.contains(record.element)) this.cancelDragRecord(id, record);
+    });
+  }
+  private cancelDragRecord(id: string, record: DragRecord): void {
+    if (this.activeDrags.get(id) !== record) return;
+    record.timeline.kill();
+    record.element.style.translate = record.originalTranslate;
+    record.element.removeAttribute("data-cursorbuild-dragging");
+    this.dragLocks.delete(record.element);
+    this.activeDrags.delete(id);
+    this.dragTimelines.delete(id);
+    const pointer = this.nodes.get(id)?.element.querySelector<SVGElement>(".cursorbuild-cursor__button");
+    if (pointer) gsap.set(pointer, { scale: 1 });
+  }
+  private finishDragRecord(id: string, record: DragRecord, pointer?: SVGElement | null): void {
+    if (this.activeDrags.get(id) !== record) return;
+    record.element.removeAttribute("data-cursorbuild-dragging");
+    this.dragLocks.delete(record.element);
+    this.activeDrags.delete(id);
+    this.dragTimelines.delete(id);
+    if (pointer) gsap.to(pointer, { scale: 1, duration: this.reducedMotion ? 0 : 0.12, transformOrigin: "3px 3px" });
   }
   private sync(): void {
     if (this.destroyed) return;
@@ -234,6 +429,7 @@ export class CursorRenderer {
     this.positions.set(id, { ...point }); gsap.set(cursor.element, { x: point.x, y: point.y });
   }
   private removeNode(id: string): void {
+    this.stopDrag(id);
     this.naturalMovement.cancel(id);
     this.tweens.get(id)?.kill(); this.tweens.delete(id);
     this.clickTimelines.get(id)?.kill(); this.clickTimelines.delete(id);

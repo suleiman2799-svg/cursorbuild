@@ -13,6 +13,7 @@ export default function App() {
  const engine = useCursorBuild();
  const stageRef = useRef<HTMLDivElement>(null);
  const rendererRef = useRef<ReturnType<typeof engine.mountCursors> | null>(null);
+ const demoTimelineRef = useRef<{ pause: () => void } | null>(null);
  const [nextId, setNextId] = useState(1);
  useEffect(() => {
   const stage = stageRef.current; if (!stage) return;
@@ -25,6 +26,7 @@ export default function App() {
   });
   rendererRef.current = renderer;
   const timeline = engine.animations.createTimeline("demo-cursor-loop", { repeat: -1, repeatDelay: 0.25 });
+  demoTimelineRef.current = timeline;
   timeline.call(() => renderer.moveNaturally("maya", pointAt(0.28, 0.4)));
   timeline.call(() => renderer.click("maya"), [], "+=0.7");
   timeline.call(() => renderer.moveNaturally("noah", pointAt(0.65, 0.58)));
@@ -35,7 +37,7 @@ export default function App() {
   timeline.call(() => renderer.moveNaturally("noah", pointAt(0.12, 0.2)));
   timeline.call(() => renderer.moveNaturally("zoe", pointAt(0.78, 0.65)), [], "+=0.4");
   return () => {
-   timeline.kill(); engine.animations.kill("demo-cursor-loop"); renderer.destroy(); rendererRef.current = null;
+   timeline.kill(); engine.animations.kill("demo-cursor-loop"); demoTimelineRef.current = null; renderer.destroy(); rendererRef.current = null;
    starterCursors.forEach((cursor) => engine.cursors.remove(cursor.id));
   };
  }, [engine]);
@@ -49,6 +51,14 @@ export default function App() {
   const guest = [...cursors].reverse().find((cursor) => cursor.id.startsWith("guest-"));
   if (guest) engine.cursors.remove(guest.id);
  }
+ function replayDrags() {
+  const stage = stageRef.current, renderer = rendererRef.current;
+  if (!stage || !renderer) return;
+  demoTimelineRef.current?.pause();
+  const width = stage.clientWidth, height = stage.clientHeight;
+  renderer.drag("maya", { target: "#drag-card-one", to: { x: Math.max(12, width * 0.56), y: Math.max(12, height * 0.2) }, duration: 1.25, curvature: 0.2 });
+  renderer.drag("noah", { target: "#drag-card-two", to: { x: Math.max(12, width * 0.12), y: Math.max(12, height * 0.62) }, duration: 1.45, curvature: 0.16 });
+ }
  return <main className="shell">
   <nav><span className="mark">C</span><span>CURSORBUILD</span><span className="nav-tag">MULTI-CURSOR ENGINE · 0.3</span></nav>
   <section className="hero"><p className="eyebrow">COLLABORATION, IN MOTION</p><h1>Many hands.<br/><em>One canvas.</em></h1>
@@ -60,9 +70,9 @@ export default function App() {
    <div className="construction-stage" ref={stageRef}><div className="stage-grid"/><div className="stage-content">
     <span className="stage-kicker">CURSORBUILD / CREATIVE STUDIO</span><h3>Ideas take shape<br/>when we build together.</h3>
     <p>Watch each collaborator's pointer press and release with its own ripple style and timing.</p>
-    <div className="stage-card-row"><div className="stage-card"><span/><strong>Design system</strong></div><div className="stage-card"><span/><strong>Live prototype</strong></div><div className="stage-card"><span/><strong>Shared vision</strong></div></div>
+    <div className="stage-card-row drag-card-row"><div id="drag-card-one" className="stage-card drag-card"><span/><strong>Design system</strong><small>Drag me · Maya</small></div><div id="drag-card-two" className="stage-card drag-card"><span/><strong>Live prototype</strong><small>Drag me · Noah</small></div></div>
    </div></div>
-   <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={!cursors.some((cursor) => cursor.id.startsWith("guest-"))}>− Remove cursor</button></div></div>
+   <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={!cursors.some((cursor) => cursor.id.startsWith("guest-"))}>− Remove cursor</button> <button onClick={replayDrags}>↻ Replay drag demo</button></div></div>
    <div className="cursor-legend">{cursors.map((cursor) => <span className="cursor-chip" key={cursor.id}><i style={{background:cursor.color}}/>{cursor.name}</span>)}</div>
   </section>
   <footer><span>FOUNDATION + NATURAL MOVEMENT + CLICK FEEDBACK · v0.3.0</span><span>Visual pointers never intercept page interaction.</span></footer>

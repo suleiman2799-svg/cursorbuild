@@ -20,7 +20,7 @@
 - [ ] Browser-level visual regression and performance profiling
 
 ## Interaction primitives
-- [ ] Drag/drop simulation
+- [x] Configurable drag/drop simulation with per-cursor timelines and element locking
 - [ ] Element resizing and positioning
 - [ ] Animated text insertion
 
