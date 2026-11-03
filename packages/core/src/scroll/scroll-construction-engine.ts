@@ -112,7 +112,7 @@ export class ScrollConstructionEngine {
       }
     });
 
-    const record = {
+    const record: SceneRecord = {
       timeline,
       scrub,
       settled: false
