@@ -224,7 +224,7 @@ export class CoordinatedActionGroup {
         this.groupController.signal.addEventListener("abort", abortFromGroup, { once: true });
         try {
           await waitWithSignal(action.definition.delay ?? 0, controller.signal);
-          if (action.status === "cancelled" || controller.signal.aborted) throw abortError();
+          if (isActionCancelled(action) || controller.signal.aborted) throw abortError();
           action.status = "running";
           await action.definition.run({
             groupId: this.id,
