@@ -12,15 +12,14 @@
 ## Cursor rendering — current
 - [x] Multiple DOM cursor rendering with individual names and colors
 - [x] Programmatic independent movement using GSAP
-- [x] Visual click pulse without dispatching page clicks
+- [x] Natural curved cursor paths, easing, configurable durations, and optional pauses
+- [x] Configurable click press/release and ripple feedback
 - [x] Pointer-transparent overlay and lifecycle cleanup
 - [x] Responsive visibility caps and reduced-motion support
 - [x] Demo with three animated identities and add/remove controls
 - [ ] Browser-level visual regression and performance profiling
 
 ## Interaction primitives
-- [x] Natural curved cursor paths, easing, configurable durations, and optional pauses
-- [ ] Richer click feedback
 - [ ] Drag/drop simulation
 - [ ] Element resizing and positioning
 - [ ] Animated text insertion
