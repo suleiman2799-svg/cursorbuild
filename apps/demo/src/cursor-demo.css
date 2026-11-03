@@ -1,0 +1,20 @@
+.construction-stage{position:relative;min-height:420px;overflow:hidden;border:1px solid #383445;border-radius:14px;background:radial-gradient(ellipse at 50% 0%,rgba(139,92,246,.16),transparent 60%),linear-gradient(145deg,#1b1a22,#121217);isolation:isolate}
+.stage-grid{position:absolute;inset:0;opacity:.22;background-image:linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px);background-size:32px 32px;mask-image:linear-gradient(to bottom,black,transparent)}
+.stage-content{position:relative;z-index:0;max-width:640px;margin:42px auto;padding:0 28px}
+.stage-kicker{font:10px 'DM Mono',monospace;letter-spacing:.16em;color:#a99bff}
+.stage-content h3{font-size:clamp(25px,4vw,42px);letter-spacing:-.06em;margin:12px 0;color:#f5f1ff}
+.stage-content p{max-width:430px;color:#aaa5b6;font-size:13px;line-height:1.7}
+.stage-card-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:28px}
+.stage-card{min-height:88px;padding:14px;border:1px solid #393544;border-radius:9px;background:rgba(255,255,255,.035);backdrop-filter:blur(8px)}
+.stage-card span{display:block;width:23px;height:23px;border-radius:7px;background:#9d8cff;margin-bottom:10px}
+.stage-card:nth-child(2) span{background:#35c9a5}.stage-card:nth-child(3) span{background:#ff7b9c}
+.stage-card strong{font-size:10px;color:#d8d3e3}
+.cursor-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px}
+.cursor-controls p{margin:0;color:#928da0;font:11px 'DM Mono',monospace}
+.cursor-controls button{border:1px solid #514a64;background:#211e2b;color:#e8e2f7;border-radius:7px;padding:9px 13px;font-size:11px;font-weight:700;cursor:pointer}
+.cursor-controls button.primary{background:#a99bff;color:#17131f;border-color:#a99bff}
+.cursor-controls button:disabled{opacity:.4;cursor:not-allowed}
+.cursor-legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.cursor-chip{display:flex;align-items:center;gap:7px;padding:7px 9px;border:1px solid #393544;border-radius:7px;color:#c9c4d3;font-size:10px}
+.cursor-chip i{width:7px;height:7px;border-radius:50%}
+@media(max-width:600px){.construction-stage{min-height:390px}.stage-content{margin:35px auto;padding:0 17px}.stage-card-row{gap:7px}.stage-card{padding:10px;min-height:76px}.stage-card strong{font-size:9px}.cursor-controls{align-items:flex-start}.cursor-controls button{padding:9px 10px}}
