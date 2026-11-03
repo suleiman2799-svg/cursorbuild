@@ -241,7 +241,7 @@ export class CursorRenderer {
     const cursorEnd = { x: destination.x + targetRect.width / 2, y: destination.y + targetRect.height / 2 };
     const computedTranslate = window.getComputedStyle(element).translate;
     const [baseTranslateX, baseTranslateY] = computedTranslate && computedTranslate !== "none"
-      ? computedTranslate.split(/\\s+/).slice(0, 2)
+      ? computedTranslate.split(/\s+/).slice(0, 2)
       : ["0px", "0px"];
     const originalTranslate = element.style.translate;
 
