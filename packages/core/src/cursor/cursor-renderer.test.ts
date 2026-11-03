@@ -217,3 +217,154 @@ describe("CursorRenderer drag simulation", () => {
     expect(() => renderer.drag("a", { target: document.createElement("div"), to: { x: 1, y: 2 } })).toThrow(/contained/);
   });
 });
+
+describe("CursorRenderer text insertion simulation", () => {
+  function addInput(host: HTMLElement, id = "typing-input") {
+    const input = document.createElement("input"); input.id = id; input.value = "Existing"; host.append(input); return input;
+  }
+  function typingTween() {
+    const timeline = gsapState.timelines[0];
+    return { timeline, vars: timeline.to.mock.calls[1][1] as { onStart?: () => void; onUpdate?: () => void; duration: number } };
+  }
+  function advanceTyping(value: number) {
+    const timeline = gsapState.timelines[0];
+    (timeline.to.mock.calls[1][0] as { value: number }).value = value;
+    (timeline.to.mock.calls[1][1] as { onUpdate?: () => void }).onUpdate?.();
+  }
+  it("types progressively into an input and removes the caret on completion", () => {
+    const { host, renderer } = setup(["a"]);
+    const input = addInput(host);
+    renderer.typeText("a", { target: "#typing-input", text: "CursorBuild", duration: 2, initialDelay: 0.2 });
+    expect(renderer.isTyping("a")).toBe(true);
+    expect(input.value).toBe("");
+    const { timeline, vars } = typingTween();
+    vars.onStart?.();
+    expect(input.matches(":focus")).toBe(true);
+    expect(host.querySelectorAll(".cursorbuild-typing-caret")).toHaveLength(1);
+    advanceTyping(0.5);
+    expect(input.value.length).toBeGreaterThan(0);
+    expect(input.value.length).toBeLessThan("CursorBuild".length);
+    const complete = timeline.eventCallback.mock.calls.find((call: unknown[]) => call[0] === "onComplete")?.[1] as (() => void) | undefined;
+    complete?.();
+    expect(input.value).toBe("CursorBuild");
+    expect(renderer.isTyping("a")).toBe(false);
+    expect(host.querySelector(".cursorbuild-typing-caret")).toBeNull();
+  });
+  it("supports textarea targets and append mode", () => {
+    const { host, renderer } = setup(["a"]);
+    const textarea = document.createElement("textarea"); textarea.value = "Hello"; host.append(textarea);
+    renderer.typeText("a", { target: textarea, text: " world", mode: "append", duration: 1 });
+    advanceTyping(1);
+    expect(textarea.value).toBe("Hello world");
+  });
+  it("supports contenteditable targets and preserves original nodes on cancellation", () => {
+    const { host, renderer } = setup(["a"]);
+    const editable = document.createElement("div"); editable.setAttribute("contenteditable", "true");
+    const original = document.createElement("strong"); original.textContent = "Old"; editable.append(original); host.append(editable);
+    renderer.typeText("a", { target: editable, text: "New", mode: "replace" });
+    expect(editable.textContent).toBe("");
+    advanceTyping(1);
+    expect(editable.textContent).toBe("New");
+    renderer.stopTextInsertion("a");
+    expect(editable.textContent).toBe("Old");
+    expect(editable.firstChild).toBe(original);
+  });
+  it("appends progressively to contenteditable without removing existing markup", () => {
+    const { host, renderer } = setup(["a"]);
+    const editable = document.createElement("div"); editable.setAttribute("contenteditable", "true");
+    const original = document.createElement("em"); original.textContent = "Keep"; editable.append(original); host.append(editable);
+    renderer.typeText("a", { target: editable, text: " it", mode: "append" });
+    advanceTyping(1);
+    expect(editable.textContent).toBe("Keep it");
+    expect(editable.firstChild).toBe(original);
+  });
+  it("uses characterIntervalMs to determine the typing tween duration", () => {
+    const { host, renderer } = setup(["a"]);
+    const input = addInput(host);
+    renderer.typeText("a", { target: input, text: "12345", duration: 10, characterIntervalMs: 80, initialDelay: 0.25 });
+    const { vars } = typingTween();
+    expect(vars.duration).toBeCloseTo(0.65);
+  });
+  it("cancels typing, restores original input value, and removes caret and timeline", () => {
+    const { host, renderer } = setup(["a"]);
+    const input = addInput(host);
+    renderer.typeText("a", { target: input, text: "Replacement" });
+    const timeline = gsapState.timelines[0];
+    advanceTyping(0.4);
+    renderer.stopTextInsertion("a");
+    expect(input.value).toBe("Existing");
+    expect(renderer.isTyping("a")).toBe(false);
+    expect(host.querySelector(".cursorbuild-typing-caret")).toBeNull();
+    expect(timeline.kill).toHaveBeenCalled();
+  });
+  it("allows independent cursors to type into separate targets simultaneously", () => {
+    const { host, renderer } = setup(["a", "b"]);
+    const one = addInput(host, "one"), two = addInput(host, "two");
+    renderer.typeText("a", { target: one, text: "First" });
+    renderer.typeText("b", { target: two, text: "Second" });
+    expect(renderer.isTyping("a")).toBe(true);
+    expect(renderer.isTyping("b")).toBe(true);
+    expect(gsapState.timelines).toHaveLength(2);
+  });
+  it("prevents another cursor from typing into a locked target", () => {
+    const { host, renderer } = setup(["a", "b"]);
+    const input = addInput(host);
+    renderer.typeText("a", { target: input, text: "One" });
+    expect(() => renderer.typeText("b", { target: input, text: "Two" })).toThrow(/already being typed/);
+  });
+  it("cancels when the target is removed", () => {
+    const { host, renderer } = setup(["a"]);
+    const input = addInput(host);
+    renderer.typeText("a", { target: input, text: "Text" });
+    input.remove();
+    expect(renderer.isTyping("a")).toBe(false);
+    expect(host.querySelector(".cursorbuild-typing-caret")).toBeNull();
+    expect(input.value).toBe("Existing");
+  });
+  it("cancels and restores the target when its cursor is removed", () => {
+    const { manager, host, renderer } = setup(["a"]);
+    const input = addInput(host);
+    renderer.typeText("a", { target: input, text: "Text" });
+    manager.remove("a");
+    expect(input.value).toBe("Existing");
+    expect(renderer.isTyping("a")).toBe(false);
+    expect(host.querySelector(".cursorbuild-typing-caret")).toBeNull();
+  });
+  it("cancels all typing and removes caret elements on renderer destruction", () => {
+    const { host, renderer } = setup(["a", "b"]);
+    const one = addInput(host, "one"), two = addInput(host, "two");
+    renderer.typeText("a", { target: one, text: "One" });
+    renderer.typeText("b", { target: two, text: "Two" });
+    renderer.destroy();
+    expect(one.value).toBe("Existing");
+    expect(two.value).toBe("Existing");
+    expect(host.querySelector(".cursorbuild-typing-caret")).toBeNull();
+  });
+  it("completes immediately when reduced motion is enabled", () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as typeof window.matchMedia;
+    const { host, renderer } = setup(["a"]);
+    const input = addInput(host);
+    expect(renderer.typeText("a", { target: input, text: "Instant" })).toBeUndefined();
+    expect(input.value).toBe("Instant");
+    expect(renderer.isTyping("a")).toBe(false);
+    expect(host.querySelector(".cursorbuild-typing-caret")).toBeNull();
+    window.matchMedia = original;
+  });
+  it("rejects unsupported targets, invalid selectors, and invalid timing options", () => {
+    const { host, renderer } = setup(["a"]);
+    const div = document.createElement("div"); host.append(div);
+    expect(() => renderer.typeText("a", { target: div, text: "No" })).toThrow(/input, textarea/);
+    expect(() => renderer.typeText("a", { target: "#missing", text: "No" })).toThrow(/did not match/);
+    expect(() => renderer.typeText("a", { target: "[", text: "No" })).toThrow(/valid CSS selector/);
+    expect(() => renderer.typeText("a", { target: div, text: "No", duration: -1 })).toThrow(RangeError);
+    expect(() => renderer.typeText("a", { target: div, text: "No", characterIntervalMs: -1 })).toThrow(RangeError);
+    expect(() => renderer.typeText("a", { target: div, text: "No", mode: "other" as "replace" })).toThrow(/mode/);
+  });
+  it("prevents dragging an element while text insertion owns it", () => {
+    const { host, renderer } = setup(["a", "b"]);
+    const input = addInput(host);
+    renderer.typeText("a", { target: input, text: "Text" });
+    expect(() => renderer.drag("b", { target: input, to: { x: 10, y: 10 } })).toThrow(/text insertion/);
+  });
+});
