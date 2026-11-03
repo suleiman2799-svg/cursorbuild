@@ -30,13 +30,12 @@ vi.mock("gsap", () => ({
       const timeline = {
         to: vi.fn().mockReturnThis(),
         fromTo: vi.fn().mockReturnThis(),
-        progress: vi.fn(function (this: unknown, value?: number) {
-          return value === undefined ? 0.35 : this;
-        }).mockReturnThis(),
+        progress: vi.fn(),
         pause: vi.fn().mockReturnThis(),
         resume: vi.fn().mockReturnThis(),
         kill: vi.fn()
       };
+      timeline.progress.mockImplementation((value?: number) => value === undefined ? (timeline as unknown as number) : timeline);
       timelines.push(timeline);
       return timeline;
     }),
@@ -117,7 +116,7 @@ describe("ScrollConstructionEngine", () => {
   it("supports pause, resume, progress inspection, and per-scene cleanup", () => {
     const { engine, trigger } = setup();
     const scene = engine.createScene("hero", { trigger: "#scene", steps: [{ id: "heading", target: "#heading", to: { opacity: 1 } }] });
-    expect(scene.progress()).toBe(0.35);
+    expect(scene.progress()).toBe(timelines[0] as unknown as number);
     scene.pause();
     expect(trigger.disable).toHaveBeenCalledOnce();
     expect(timelines[0].pause).toHaveBeenCalledOnce();
