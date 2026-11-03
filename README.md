@@ -2,7 +2,7 @@
 
 **CursorBuild** is an open-source, modular foundation for scroll-driven, multi-cursor website construction animations.
 
-> **Status: early development (v0.3.0).** The foundation, multiple-cursor rendering, natural movement, configurable visual click feedback, and drag/drop simulation are implemented. Text insertion simulation is now implemented; element resizing and full cinematic construction sequences remain planned.
+> **Status: early development (v0.5.0).** The foundation, multiple-cursor rendering, natural movement, configurable visual click feedback, drag/drop, text insertion, and the independent cinematic animation engine are implemented. Element resizing is being reviewed in PR #6; scroll-driven construction and later orchestration milestones remain planned.
 
 ## Technology stack
 - **TypeScript** — framework-agnostic core
@@ -82,6 +82,47 @@ renderer.click("designer-2", { style: "press", duration: 0.24 });
 Defaults are 0.32 seconds, ripple scale 2.15, intensity 0.72, and combined press/ripple style. A press compresses and releases the SVG pointer; a ripple animates the existing halo node, so no temporary DOM elements are created. Each cursor owns an independent click timeline. A new click replaces only that same cursor's active click animation. Click feedback is visual only and never triggers page interaction.
 
 When `prefers-reduced-motion: reduce` is active and `respectReducedMotion` is enabled (the default), click animations are suppressed and movement snaps to its destination. Set `respectReducedMotion: false` only when your application has an explicit alternative accessibility strategy.
+
+## Cinematic animation engine
+
+Cinematic animations are independent from cursor simulation. Use the engine-owned instance or create a standalone `CinematicAnimationEngine` when you do not need cursors:
+
+~~~ts
+import { CursorBuildEngine, CinematicAnimationEngine } from "@cursorbuild/core";
+
+// Standalone use:
+const cinematic = new CinematicAnimationEngine({
+  respectReducedMotion: true,
+  defaults: { duration: 0.8, ease: "power3.out" }
+});
+
+// Or use the instance owned by CursorBuildEngine:
+const engine = new CursorBuildEngine();
+const motion = engine.cinematic;
+
+const title = motion.revealText("#hero-title", { direction: "left", delay: 0.1 });
+const image = motion.revealImage("#hero-image", { direction: "right", duration: 1.1 });
+motion.revealMask(".feature-mask", { direction: "bottom" });
+motion.enterSection("#intro-section", { from: { y: 48, opacity: 0 } });
+motion.parallax(".decorative-art", { axis: "y", distance: 64 });
+motion.assemble(".product-part", { stagger: 0.12 });
+const cards = motion.stagger(".feature-card", {
+  from: { opacity: 0, y: 22 },
+  to: { opacity: 1, y: 0 },
+  stagger: 0.14,
+  duration: 0.55
+});
+
+// Returned GSAP timelines can be paused, reversed, or composed.
+title?.reverse();
+image?.pause();
+engine.destroy(); // disposes engine-owned cinematic timelines
+cinematic.destroy(); // use this instead when using the standalone instance
+~~~
+
+The API includes `revealText`, `revealImage`, `revealMask`, `enterSection`, `parallax`, `transition`, `assemble`, `stagger`, and `createTimeline`. Each method accepts an `Element`, a CSS selector, or an array of elements where applicable. Timing is configurable with `duration`, `ease`, `delay`, and `stagger`. Reveal directions are `left`, `right`, `top`, and `bottom`.
+
+Text, image, and mask reveals use CSS `clip-path`; image reveals also settle scale. `parallax()` is a reusable positional tween, not a scroll listener or scroll-linked timeline. Scroll-driven playback belongs to the next construction milestone. The engine respects `prefers-reduced-motion` by applying final values immediately and finishes active animations if the preference changes to reduce. The core has no React dependency; the returned GSAP timelines remain reversible through GSAP's normal timeline API.
 
 ## Getting started
 
