@@ -41,7 +41,7 @@ function setup() {
 }
 
 async function flushActionScheduling(): Promise<void> {
-  for (let index = 0; index < 6; index += 1) await new Promise<void>((resolve) => queueMicrotask(resolve));
+  for (let index = 0; index < 6; index += 1) await Promise.resolve();
 }
 
 describe("MultiCursorCoordinator", () => {
