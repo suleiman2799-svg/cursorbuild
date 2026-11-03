@@ -161,3 +161,24 @@ renderer.stopTextInsertion("designer"); // cancel and restore original content
 Use characterIntervalMs instead of duration to specify a per-character interval in milliseconds. Duration defaults to 1.8 seconds, initialDelay to 0.12 seconds, and mode to replace. Targets must be contained by the mounted container and must be a text-like input (text, search, email, URL, telephone, or password), textarea, or [contenteditable="true"] element. Contenteditable insertion is plain text; replace mode temporarily detaches existing child nodes and restores them if cancelled.
 
 Typing is a visual DOM simulation. CursorBuild focuses the target and updates its value/text progressively, but does not dispatch keyboard, beforeinput, or input events. **Controlled React/Vue/etc. inputs may not synchronize their framework state** with these programmatic value changes; use an application callback/state update or an uncontrolled input for framework-managed forms. Cancellation restores the original value/content and removes the temporary caret. Removed targets, cursor removal, renderer destruction, and reduced-motion preferences are handled automatically. The caret and cursor use the existing overlay; no new dependency is required.
+
+
+## Element resizing simulation
+
+The resize() API makes a collaborator cursor approach a design element, reveal a selection frame with eight handles, acquire the configured handle, and progressively change the element's rendered width and height:
+
+~~~ts
+renderer.resize("designer", {
+  target: "#design-card", // CSS selector or contained HTMLElement
+  to: { width: 480, height: 280 },
+  duration: 1.2,
+  curvature: 0.16,
+  handle: "bottom-right"
+});
+renderer.isResizing("designer");
+renderer.stopResize("designer"); // cancel and restore original inline dimensions
+~~~
+
+The handle can be top-left, top, top-right, right, bottom-right, bottom, bottom-left, or left. Width and height are positive rendered CSS-pixel dimensions. Duration defaults to 1.2 seconds and curvature to 0.16 (0–1). Separate cursors can resize separate targets concurrently; a target is locked while selected. The simulation changes only inline width and height, leaving the target's transform and positioning styles untouched. Successful resizes retain their final dimensions; cancellation restores the original inline width and height.
+
+The selection frame and handles are temporary elements in the renderer overlay. Removed targets, cursor removal, renderer destruction, and reduced-motion preferences are handled automatically. Reduced motion applies the final dimensions immediately. This is a visual DOM simulation only: it does not dispatch pointer events, implement layout-editor constraints, or emulate browser-native resize gestures.
