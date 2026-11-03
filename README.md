@@ -94,8 +94,8 @@ npm run typecheck
 
 ## Roadmap
 1. **Foundation:** engine lifecycle, configuration, cursor registry, GSAP/ScrollTrigger managers, action sequencing, React integration, demo, and tests.
-2. **Cursor rendering (current):** multiple DOM cursors, identity labels/colors, programmatic movement, click pulse, responsive visibility, and reduced-motion support.
-3. **Interaction primitives:** natural movement profiles, richer click feedback, drag/drop, resizing, positioning, and animated text insertion.
+2. **Cursor rendering and natural movement (current):** multiple DOM cursors, identity labels/colors, direct and curved movement, configurable easing/duration, optional pauses, click pulse, responsive visibility, and reduced-motion support.
+3. **Interaction primitives:** richer click feedback, drag/drop, resizing, positioning, and animated text insertion.
 4. **Orchestration:** declarative timelines, multi-cursor coordination, responsive scenes, and reduced-motion behaviour.
 5. **Production readiness:** browser integration tests, accessibility/performance validation, API documentation, and release automation.
 
