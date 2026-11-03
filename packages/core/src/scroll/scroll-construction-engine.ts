@@ -195,14 +195,14 @@ export class ScrollConstructionEngine {
       return target;
     }
     if (typeof document === "undefined") throw new Error("Selector triggers require a browser document.");
+    let element: Element | null;
     try {
-      const element = document.querySelector(target);
-      if (!element) throw new Error("Construction scene trigger did not match: " + target);
-      return element;
-    } catch (error) {
-      if (error instanceof TypeError) throw new TypeError("Construction scene trigger must be a valid CSS selector.");
-      throw error;
+      element = document.querySelector(target);
+    } catch {
+      throw new TypeError("Construction scene trigger must be a valid CSS selector.");
     }
+    if (!element) throw new Error("Construction scene trigger did not match: " + target);
+    return element;
   }
 
   private resolveTargets(target: ScrollConstructionTarget): Element[] {
