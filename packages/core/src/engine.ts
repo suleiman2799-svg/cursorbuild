@@ -1,4 +1,5 @@
 import { AnimationManager } from "./animation/animation-manager.js";
+import { CinematicAnimationEngine } from "./animation/cinematic-animation-engine.js";
 import { resolveConfig } from "./config.js";
 import { CursorManager } from "./cursor/cursor-manager.js";
 import { CursorRenderer } from "./cursor/cursor-renderer.js";
@@ -9,10 +10,14 @@ export class CursorBuildEngine {
  readonly config: CursorBuildConfig;
  readonly cursors = new CursorManager();
  readonly animations = new AnimationManager();
+ readonly cinematic: CinematicAnimationEngine;
  readonly scroll = new ScrollManager();
  private readonly cursorRenderers = new Set<CursorRenderer>();
  private destroyed = false;
- constructor(config: Partial<CursorBuildConfig> = {}) { this.config = resolveConfig(config); }
+ constructor(config: Partial<CursorBuildConfig> = {}) {
+  this.config = resolveConfig(config);
+  this.cinematic = new CinematicAnimationEngine({ respectReducedMotion: this.config.respectReducedMotion });
+ }
  /** Attach a visual cursor layer. Coordinates are container-relative CSS pixels. */
  mountCursors(container: HTMLElement, options: CursorRendererOptions = {}): CursorRenderer {
   if (this.destroyed) throw new Error("CursorBuildEngine has been destroyed.");
@@ -27,6 +32,7 @@ export class CursorBuildEngine {
   this.cursorRenderers.forEach((renderer) => renderer.destroy());
   this.cursorRenderers.clear();
   this.animations.killAll();
+  this.cinematic.destroy();
   this.scroll.killAll();
  }
 }
