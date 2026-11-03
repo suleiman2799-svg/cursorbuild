@@ -161,3 +161,37 @@ renderer.stopTextInsertion("designer"); // cancel and restore original content
 Use characterIntervalMs instead of duration to specify a per-character interval in milliseconds. Duration defaults to 1.8 seconds, initialDelay to 0.12 seconds, and mode to replace. Targets must be contained by the mounted container and must be a text-like input (text, search, email, URL, telephone, or password), textarea, or [contenteditable="true"] element. Contenteditable insertion is plain text; replace mode temporarily detaches existing child nodes and restores them if cancelled.
 
 Typing is a visual DOM simulation. CursorBuild focuses the target and updates its value/text progressively, but does not dispatch keyboard, beforeinput, or input events. **Controlled React/Vue/etc. inputs may not synchronize their framework state** with these programmatic value changes; use an application callback/state update or an uncontrolled input for framework-managed forms. Cancellation restores the original value/content and removes the temporary caret. Removed targets, cursor removal, renderer destruction, and reduced-motion preferences are handled automatically. The caret and cursor use the existing overlay; no new dependency is required.
+
+## Scroll-driven construction scenes
+
+Use the engine's construction API to bind an independent GSAP timeline to a page section. The core remains framework-independent, and scenes can be used without mounting cursor overlays:
+
+~~~ts
+const engine = new CursorBuildEngine();
+
+const heroScene = engine.construction.createScene(
+  "hero",
+  {
+    trigger: "#hero",
+    start: "top 80%",
+    end: "bottom 20%",
+    reverse: true,
+    onProgress: (progress) => console.log("Hero construction:", progress)
+  },
+  (timeline) => {
+    timeline.from("#hero h1", { y: 36, opacity: 0, duration: 0.7 });
+    timeline.from("#hero p", { y: 20, opacity: 0, duration: 0.45 }, "<0.15");
+    timeline.from("#hero img", { scale: 0.92, opacity: 0, duration: 0.8 }, 0);
+  }
+);
+
+// Scene controls:
+heroScene.pause();
+heroScene.resume();
+heroScene.refresh();
+heroScene.destroy();
+
+// Or let engine.destroy() clean up every scene.
+~~~
+
+Each scene has its own ScrollTrigger and paused GSAP timeline. Scroll progress seeks the timeline from 0 to 1; reverse: false keeps progress from decreasing when the visitor scrolls backwards. Use GSAP timeline positions to compose sequential and simultaneous work. start and end accept ScrollTrigger expressions, and onProgress receives normalized progress. Call engine.construction.refresh() after application layout changes that affect trigger measurements. Destroy individual scenes with destroyScene(id) or dispose all scenes through engine.destroy().
