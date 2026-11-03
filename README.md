@@ -161,3 +161,59 @@ renderer.stopTextInsertion("designer"); // cancel and restore original content
 Use characterIntervalMs instead of duration to specify a per-character interval in milliseconds. Duration defaults to 1.8 seconds, initialDelay to 0.12 seconds, and mode to replace. Targets must be contained by the mounted container and must be a text-like input (text, search, email, URL, telephone, or password), textarea, or [contenteditable="true"] element. Contenteditable insertion is plain text; replace mode temporarily detaches existing child nodes and restores them if cancelled.
 
 Typing is a visual DOM simulation. CursorBuild focuses the target and updates its value/text progressively, but does not dispatch keyboard, beforeinput, or input events. **Controlled React/Vue/etc. inputs may not synchronize their framework state** with these programmatic value changes; use an application callback/state update or an uncontrolled input for framework-managed forms. Cancellation restores the original value/content and removes the temporary caret. Removed targets, cursor removal, renderer destruction, and reduced-motion preferences are handled automatically. The caret and cursor use the existing overlay; no new dependency is required.
+
+
+## Multi-cursor coordination engine
+
+Coordinate independent cursor action tracks without coupling the core to a UI framework or a particular animation engine. Each cursor gets its own timeline; combine timelines into a shared group to run collaborators in parallel, sequence actions, express cross-cursor dependencies, and cancel work.
+
+~~~ts
+const coordinator = engine.coordination;
+
+const designer = coordinator.createTimeline("maya", [
+  {
+    id: "move-to-card",
+    run: async ({ signal }) => {
+      const animation = renderer.moveNaturally("maya", { x: 280, y: 180 });
+      if (animation) await animation;
+      if (signal.aborted) return;
+    }
+  },
+  {
+    id: "type-heading",
+    run: async () => {
+      const animation = renderer.typeText("maya", {
+        target: "#card-title",
+        text: "A shared idea",
+        duration: 1.1
+      });
+      if (animation) await animation;
+    }
+  }
+]);
+
+const reviewer = coordinator.createTimeline("noah", [
+  {
+    id: "review-card",
+    dependsOn: ["type-heading"],
+    run: async () => {
+      const animation = renderer.drag("noah", {
+        target: "#review-card",
+        to: { x: 420, y: 180 }
+      });
+      if (animation) await animation;
+    }
+  }
+], { delay: 180 });
+
+const group = coordinator.createGroup("hero-construction", [designer, reviewer]);
+await group.run();
+
+// Cancel one action or the complete shared group:
+group.cancelAction("review-card");
+coordinator.cancelGroup("hero-construction");
+~~~
+
+Cursor timelines run sequentially by default; set `mode: "parallel"` to run independent actions on the same cursor concurrently. Separate cursor timelines start together unless a timeline delay or action dependency says otherwise. Dependencies may refer to actions on another cursor. Group, timeline, and action delays are milliseconds. An action should return a promise that settles when its work is complete; GSAP timelines can be awaited. For fire-and-forget APIs such as visual click feedback, use the action context's abort-aware `wait(milliseconds)` when later work must wait for the effect.
+
+The coordinator invokes caller-provided callbacks and passes the cursor ID, action ID, group ID, and an `AbortSignal`. It does not synthesize DOM events, own cursor rendering, or assume that a cursor API exists. This adapter boundary lets actions call movement, click, drag, typing, resizing, cinematic animation, or scroll-scene controls while keeping those modules independently usable. Cancellation is cooperative: callbacks should observe the signal and settle promptly when aborted. Destroying the engine cancels every coordination group.
