@@ -51,6 +51,14 @@ export default function App() {
   const guest = [...cursors].reverse().find((cursor) => cursor.id.startsWith("guest-"));
   if (guest) engine.cursors.remove(guest.id);
  }
+ function replayDrags() {
+  const stage = stageRef.current, renderer = rendererRef.current;
+  if (!stage || !renderer) return;
+  demoTimelineRef.current?.pause();
+  const width = stage.clientWidth, height = stage.clientHeight;
+  renderer.drag("maya", { target: "#drag-card-one", to: { x: Math.max(12, width * 0.56), y: Math.max(12, height * 0.2) }, duration: 1.25, curvature: 0.2 });
+  renderer.drag("noah", { target: "#drag-card-two", to: { x: Math.max(12, width * 0.12), y: Math.max(12, height * 0.62) }, duration: 1.45, curvature: 0.16 });
+ }
  return <main className="shell">
   <nav><span className="mark">C</span><span>CURSORBUILD</span><span className="nav-tag">MULTI-CURSOR ENGINE · 0.3</span></nav>
   <section className="hero"><p className="eyebrow">COLLABORATION, IN MOTION</p><h1>Many hands.<br/><em>One canvas.</em></h1>
