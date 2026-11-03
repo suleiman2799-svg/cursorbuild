@@ -561,7 +561,7 @@ export class CursorRenderer {
     const originalWidth = element.style.width, originalHeight = element.style.height;
     const originalTranslate = element.style.translate;
     const computedTranslate = originalTranslate || computed.translate;
-    const translateParts = computedTranslate && computedTranslate !== "none" ? computedTranslate.split(/\\s+/) : [];
+    const translateParts = computedTranslate && computedTranslate !== "none" ? computedTranslate.split(/\s+/) : [];
     const baseTranslateX = translateParts[0] || "0px";
     const baseTranslateY = translateParts[1] || "0px";
     const baseTranslateZ = translateParts[2];
