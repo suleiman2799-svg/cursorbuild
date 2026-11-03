@@ -1,8 +1,6 @@
 # Development roadmap
 
-Items below are planned unless listed in the current foundation section.
-
-## Foundation — current
+## Foundation — complete
 - [x] TypeScript core package and public exports
 - [x] Configuration defaults and validation
 - [x] Cursor identity registry with subscriptions
@@ -11,20 +9,28 @@ Items below are planned unless listed in the current foundation section.
 - [x] React provider and hooks
 - [x] Vite demo and Vitest baseline
 
+## Cursor rendering — current
+- [x] Multiple DOM cursor rendering with individual names and colors
+- [x] Programmatic independent movement using GSAP
+- [x] Visual click pulse without dispatching page clicks
+- [x] Pointer-transparent overlay and lifecycle cleanup
+- [x] Responsive visibility caps and reduced-motion support
+- [x] Demo with three animated identities and add/remove controls
+- [ ] Browser-level visual regression and performance profiling
+
 ## Interaction primitives
-- [ ] Cursor DOM renderer and pointer state model
-- [ ] Natural movement, easing profiles, and click feedback
-- [ ] Drag/drop, resize, positioning, and text insertion primitives
-- [ ] Per-cursor identity visuals and presence lifecycle
+- [ ] Natural movement profiles and richer click feedback
+- [ ] Drag/drop simulation
+- [ ] Element resizing and positioning
+- [ ] Animated text insertion
 
 ## Orchestration
-- [ ] Declarative timeline schema and labels
+- [ ] Declarative timelines and reusable scroll scenes
 - [ ] Multi-cursor coordination and conflict rules
-- [ ] Scroll scene composition and responsive breakpoints
-- [ ] Reduced-motion strategy and deterministic cleanup
+- [ ] Responsive scene composition and reduced-motion strategy
 
 ## Ecosystem
 - [ ] Reusable construction-effect components
-- [ ] Framework examples and API reference
-- [ ] Browser integration tests, accessibility checks, and performance benchmarks
+- [ ] API reference and integration examples
+- [ ] Accessibility and performance benchmarks
 - [ ] Release automation
