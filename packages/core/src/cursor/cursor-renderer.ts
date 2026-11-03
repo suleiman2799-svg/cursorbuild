@@ -204,7 +204,7 @@ export class CursorRenderer {
     this.assertActive(); this.stopTextInsertion(id); this.stopDrag(id); this.stopResize(id); this.cancelRendererTween(id); return this.naturalMovement.moveTo(id, point, options);
   }
   moveSequence(id: string, steps: NaturalMovementStep[], options: NaturalMovementOptions = {}): gsap.core.Timeline | undefined {
-    this.assertActive(); this.stopTextInsertion(id); this.stopDrag(id); this.cancelRendererTween(id); return this.naturalMovement.playSequence(id, steps, options);
+    this.assertActive(); this.stopTextInsertion(id); this.stopDrag(id); this.stopResize(id); this.cancelRendererTween(id); return this.naturalMovement.playSequence(id, steps, options);
   }
   stopNaturalMovement(id: string): void { this.assertActive(); this.naturalMovement.cancel(id); }
 
