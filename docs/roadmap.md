@@ -26,7 +26,7 @@
 
 ## Orchestration
 - [ ] Declarative timelines and reusable scroll scenes
-- [ ] Multi-cursor coordination and conflict rules
+- [x] Multi-cursor coordination engine: independent cursor timelines, parallel/sequential groups, cross-cursor dependencies, delays, cancellation, and lifecycle cleanup (Step 8 PR)
 - [ ] Responsive scene composition and reduced-motion strategy
 
 ## Ecosystem
