@@ -1,18 +1,21 @@
 import { gsap } from "gsap";
 import type { CursorPoint } from "./cursor-renderer.js";
 
-export interface NaturalMovementOptions {
+export interface NaturalMoveOptions {
   /** Duration in seconds for each segment. */
   duration?: number;
   /** Any GSAP easing string, for example "power3.inOut". */
   ease?: string;
   /** Curve height as a fraction of segment distance (0 = straight, 0.18 = subtle arc). */
   curvature?: number;
+}
+
+export interface NaturalMovementOptions extends NaturalMoveOptions {
   /** Optional pause between sequence steps, in seconds or a [minimum, maximum] range. */
   pauseBetween?: number | readonly [number, number];
 }
 
-export interface NaturalMovementStep {
+export interface NaturalMovementStep extends NaturalMoveOptions {
   to: CursorPoint;
   duration?: number;
   ease?: string;
@@ -113,7 +116,7 @@ export class NaturalCursorMovementEngine {
   private readonly defaultPause?: number | readonly [number, number];
 
   /** Animate one identity along a curved, eased path. Returns its owned timeline. */
-  moveTo(id: string, to: CursorPoint, options: Omit<NaturalMovementStep, "pauseAfter"> = {}): gsap.core.Timeline | undefined {
+  moveTo(id: string, to: CursorPoint, options: NaturalMoveOptions = {}): gsap.core.Timeline | undefined {
     return this.playSequence(id, [{ to, ...options }]);
   }
 
