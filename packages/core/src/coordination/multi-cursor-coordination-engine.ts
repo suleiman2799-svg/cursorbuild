@@ -107,6 +107,7 @@ export class CoordinatedActionGroup {
   private groupStatus: CoordinationGroupStatus = "idle";
   private runPromise?: Promise<void>;
   private failure?: unknown;
+  private hasFailure = false;
 
   constructor(
     readonly id: string,
@@ -175,7 +176,7 @@ export class CoordinatedActionGroup {
       const results = await Promise.allSettled(jobs);
       const rejected = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
       if (rejected) {
-        if (this.failure !== undefined) {
+        if (this.hasFailure) {
           this.groupStatus = "failed";
           throw this.failure;
         }
@@ -238,6 +239,7 @@ export class CoordinatedActionGroup {
         }
         if (action.status === "failed") {
           this.failure = error;
+          this.hasFailure = true;
           this.groupController.abort();
           this.actions.forEach((sibling) => {
             if (sibling.status === "pending" || sibling.status === "running") {
