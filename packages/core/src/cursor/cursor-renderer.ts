@@ -81,8 +81,10 @@ interface ResizeRecord {
   frame: HTMLDivElement;
   originalWidth: string;
   originalHeight: string;
+  originalTranslate: string;
   cssTargetWidth: number;
   cssTargetHeight: number;
+  cssTargetTranslate: string;
   handle: ResizeHandle;
   clickTimeline?: gsap.core.Timeline;
 }
@@ -543,9 +545,35 @@ export class CursorRenderer {
     const computed = window.getComputedStyle(element);
     const extraW = (parseFloat(computed.paddingLeft)||0)+(parseFloat(computed.paddingRight)||0)+(parseFloat(computed.borderLeftWidth)||0)+(parseFloat(computed.borderRightWidth)||0);
     const extraH = (parseFloat(computed.paddingTop)||0)+(parseFloat(computed.paddingBottom)||0)+(parseFloat(computed.borderTopWidth)||0)+(parseFloat(computed.borderBottomWidth)||0);
+    // Use untransformed CSS box dimensions: getBoundingClientRect() includes
+    // rotation/scale and would make the requested dimensions drift on transformed targets.
+    const computedWidth = parseFloat(computed.width), computedHeight = parseFloat(computed.height);
+    const startCssWidth = Number.isFinite(computedWidth)
+      ? computedWidth
+      : Math.max(0, (element.offsetWidth || rect.width) - (computed.boxSizing === "border-box" ? 0 : extraW));
+    const startCssHeight = Number.isFinite(computedHeight)
+      ? computedHeight
+      : Math.max(0, (element.offsetHeight || rect.height) - (computed.boxSizing === "border-box" ? 0 : extraH));
+    const startBoxWidth = computed.boxSizing === "border-box" ? startCssWidth : startCssWidth + extraW;
+    const startBoxHeight = computed.boxSizing === "border-box" ? startCssHeight : startCssHeight + extraH;
     const cssW = computed.boxSizing === "border-box" ? options.to.width : Math.max(0,options.to.width-extraW);
     const cssH = computed.boxSizing === "border-box" ? options.to.height : Math.max(0,options.to.height-extraH);
     const originalWidth = element.style.width, originalHeight = element.style.height;
+    const originalTranslate = element.style.translate;
+    const computedTranslate = computed.translate;
+    const translateParts = computedTranslate && computedTranslate !== "none" ? computedTranslate.split(/\\s+/) : [];
+    const baseTranslateX = translateParts[0] || "0px";
+    const baseTranslateY = translateParts[1] || "0px";
+    const setAnchorOffset = (width: number, height: number) => {
+      const dx = handle.includes("left") ? startBoxWidth - width : 0;
+      const dy = handle.includes("top") ? startBoxHeight - height : 0;
+      element.style.translate = `calc(${baseTranslateX} + ${dx}px) calc(${baseTranslateY} + ${dy}px)`;
+    };
+    const cssTargetTranslate = (() => {
+      const dx = handle.includes("left") ? startBoxWidth - options.to.width : 0;
+      const dy = handle.includes("top") ? startBoxHeight - options.to.height : 0;
+      return `calc(${baseTranslateX} + ${dx}px) calc(${baseTranslateY} + ${dy}px)`;
+    })();
     const frame = document.createElement("div");
     frame.className = "cursorbuild-resize-frame"; frame.setAttribute("aria-hidden","true");
     RESIZE_HANDLES.forEach((name)=>{
@@ -570,7 +598,7 @@ export class CursorRenderer {
     if(!start){frame.remove();throw new Error("Cursor has no starting position: "+id);}
     const destination=handlePoint(), controls=getNaturalControlPoints(start,destination,curvature,id+":resize");
     const approach={value:0}, progress={value:0}, timeline=gsap.timeline();
-    const record:ResizeRecord={element,timeline,frame,originalWidth,originalHeight,cssTargetWidth:cssW,cssTargetHeight:cssH,handle};
+    const record:ResizeRecord={element,timeline,frame,originalWidth,originalHeight,originalTranslate,cssTargetWidth:cssW,cssTargetHeight:cssH,cssTargetTranslate,handle};
     this.resizeLocks.set(element,id);this.activeResizes.set(id,record);
     const removed=()=>{
       if(!element.isConnected || !this.container.contains(element)){this.cancelResizeRecord(id,record);return true;}
@@ -578,6 +606,7 @@ export class CursorRenderer {
     };
     if(this.reducedMotion || duration===0){
       element.style.width=cssW+"px";element.style.height=cssH+"px";
+      setAnchorOffset(options.to.width,options.to.height);
       updateFrame();this.setNaturalPosition(id,handlePoint());this.finishResizeRecord(id,record);return undefined;
     }
     timeline.to(approach,{value:1,duration:duration*0.3,ease:"power2.inOut",onUpdate:()=>{
@@ -592,16 +621,18 @@ export class CursorRenderer {
       },
       onUpdate:()=>{
         if(this.activeResizes.get(id)!==record || removed())return;
-        const w=rect.width+(options.to.width-rect.width)*progress.value;
-        const h=rect.height+(options.to.height-rect.height)*progress.value;
-        element.style.width=(computed.boxSizing==="border-box"?w:Math.max(0,w-extraW))+"px";
-        element.style.height=(computed.boxSizing==="border-box"?h:Math.max(0,h-extraH))+"px";
+        const w=startBoxWidth+(options.to.width-startBoxWidth)*progress.value;
+        const h=startBoxHeight+(options.to.height-startBoxHeight)*progress.value;
+        element.style.width=(startCssWidth+(cssW-startCssWidth)*progress.value)+"px";
+        element.style.height=(startCssHeight+(cssH-startCssHeight)*progress.value)+"px";
+        setAnchorOffset(w,h);
         updateFrame();this.setNaturalPosition(id,handlePoint());
       }
     });
     timeline.eventCallback("onComplete",()=>{
       if(this.activeResizes.get(id)!==record)return;
       element.style.width=cssW+"px";element.style.height=cssH+"px";
+      element.style.translate=cssTargetTranslate;
       updateFrame();this.setNaturalPosition(id,handlePoint());this.finishResizeRecord(id,record);
     });
     return timeline;
@@ -630,6 +661,7 @@ export class CursorRenderer {
     record.timeline.kill();
     if(record.clickTimeline && this.clickTimelines.get(id)===record.clickTimeline){record.clickTimeline.kill();this.clickTimelines.delete(id);}
     record.element.style.width=record.originalWidth;record.element.style.height=record.originalHeight;
+    record.element.style.translate=record.originalTranslate;
     record.frame.remove();this.resizeLocks.delete(record.element);this.activeResizes.delete(id);
   }
   private finishResizeRecord(id:string,record:ResizeRecord):void{
@@ -638,7 +670,7 @@ export class CursorRenderer {
   }
   private completeResize(id:string,record:ResizeRecord):void{
     if(this.activeResizes.get(id)!==record)return;
-    record.timeline.kill();record.element.style.width=record.cssTargetWidth+"px";record.element.style.height=record.cssTargetHeight+"px";
+    record.timeline.kill();record.element.style.width=record.cssTargetWidth+"px";record.element.style.height=record.cssTargetHeight+"px";record.element.style.translate=record.cssTargetTranslate;
     const r=record.element.getBoundingClientRect(),c=this.container.getBoundingClientRect();
     const ox=c.left+this.container.clientLeft-this.container.scrollLeft,oy=c.top+this.container.clientTop-this.container.scrollTop;
     const x=record.handle.includes("left")?r.left:record.handle.includes("right")?r.right:r.left+r.width/2;
