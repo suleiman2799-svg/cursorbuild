@@ -2,7 +2,7 @@
 
 **CursorBuild** is an open-source, modular foundation for scroll-driven, multi-cursor website construction animations.
 
-> **Status: early development (v0.3.0).** The foundation, multiple-cursor rendering, natural movement, configurable visual click feedback, and drag/drop simulation are implemented. Text insertion simulation is now implemented; element resizing and full cinematic construction sequences remain planned.
+> **Status: early development (v0.6.0).** The foundation, multiple-cursor rendering, natural movement, configurable visual click feedback, drag/drop, text insertion, and scroll-driven construction scenes are implemented. The cinematic animation engine is in PR #7 and element resizing is in PR #6; both remain open for review.
 
 ## Technology stack
 - **TypeScript** — framework-agnostic core
@@ -82,6 +82,53 @@ renderer.click("designer-2", { style: "press", duration: 0.24 });
 Defaults are 0.32 seconds, ripple scale 2.15, intensity 0.72, and combined press/ripple style. A press compresses and releases the SVG pointer; a ripple animates the existing halo node, so no temporary DOM elements are created. Each cursor owns an independent click timeline. A new click replaces only that same cursor's active click animation. Click feedback is visual only and never triggers page interaction.
 
 When `prefers-reduced-motion: reduce` is active and `respectReducedMotion` is enabled (the default), click animations are suppressed and movement snaps to its destination. Set `respectReducedMotion: false` only when your application has an explicit alternative accessibility strategy.
+
+## Scroll-driven construction scenes
+
+Create independent timelines that follow the visitor's scroll position. The construction engine is framework-independent and does not require cursor rendering:
+
+~~~ts
+import { CursorBuildEngine } from "@cursorbuild/core";
+
+const engine = new CursorBuildEngine();
+const scene = engine.construction.createScene("hero-build", {
+  trigger: "#hero-section",
+  start: "top 80%",
+  end: "bottom 20%",
+  scrub: true,
+  onProgress: (progress) => console.log(progress),
+  steps: [
+    {
+      id: "heading", target: "#hero-title",
+      from: { opacity: 0, y: 36 },
+      to: { opacity: 1, y: 0 },
+      duration: 0.8
+    },
+    {
+      id: "artwork", target: "#hero-artwork",
+      from: { opacity: 0, scale: 0.92 },
+      to: { opacity: 1, scale: 1 },
+      duration: 1, position: "<" // run alongside the heading
+    },
+    {
+      id: "copy", target: "#hero-copy",
+      from: { opacity: 0, y: 20 },
+      to: { opacity: 1, y: 0 },
+      duration: 0.6 // appended after the previous step
+    }
+  ]
+});
+
+scene.progress(); // current timeline progress, 0–1
+scene.pause();
+scene.resume();
+scene.kill();
+engine.destroy();
+~~~
+
+Each step targets an Element, selector, or Element array and animates GSAP `from`/`to` values. Omit `from` to animate from the current rendered state. Steps without `position` are appended sequentially; use a GSAP position such as `"<"` or a numeric position for simultaneous/overlapping construction. `scrub: true` (default) ties the timeline to scroll and naturally reverses as the visitor scrolls upward. With `scrub: false`, `reverseOnScrollUp` controls the trigger's reverse action. Configure `start`, `end`, and numeric scrub smoothing as needed.
+
+Use `engine.construction.getScene(id)`, `pauseScene(id)`, `resumeScene(id)`, `killScene(id)`, and `killAll()` to manage scenes. Multiple scenes can exist independently on one page. `onProgress` receives ScrollTrigger progress. When reduced motion is active, scenes settle to their final state immediately; active scenes are settled and their triggers removed if the preference changes to reduce. Destroying the engine kills scene timelines/triggers and removes the media-query listener.
 
 ## Getting started
 
