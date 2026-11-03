@@ -98,6 +98,7 @@ export class CursorRenderer {
     if (!this.nodes.has(id)) throw new Error("Unknown rendered cursor: " + id);
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new TypeError("Cursor coordinates must be finite numbers.");
     if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Movement duration must be finite and non-negative.");
+    this.naturalMovement.cancel(id);
     this.positions.set(id, { ...point });
     const node = this.nodes.get(id)!.element;
     this.tweens.get(id)?.kill();
