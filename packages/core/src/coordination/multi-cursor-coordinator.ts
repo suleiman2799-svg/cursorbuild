@@ -28,7 +28,6 @@ export interface CoordinationOptions {
 interface ActiveAction {
   groupId: string;
   controller: AbortController;
-  animation?: gsap.core.Animation;
 }
 
 type AnimationCallback = (this: gsap.core.Animation, ...args: unknown[]) => void;
@@ -146,7 +145,6 @@ export class MultiCursorCoordinator {
         signal: controller.signal
       });
       if (this.isAnimation(result)) {
-        record.animation = result;
         await this.waitForAnimation(result, controller.signal);
       } else if (result && typeof (result as Promise<void>).then === "function") {
         await this.waitForPromise(result as Promise<void>, controller.signal);
