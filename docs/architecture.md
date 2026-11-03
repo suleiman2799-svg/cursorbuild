@@ -39,3 +39,13 @@ The press animation scales the existing SVG pointer down and back to its resting
 ## Extension approach
 
 Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport, real collaboration networking, drag/drop, resizing, text insertion, and construction-scene authoring are future modules, not part of the current renderer.
+
+## Drag-and-drop simulation
+
+Drag simulation is owned by CursorRenderer and uses the existing GSAP dependency. `drag(id, { target, to, duration, curvature, grabScale })` resolves a CSS selector within the mounted container or accepts a contained HTMLElement. The cursor first follows a cubic Bezier approach path to the target's center, compresses its SVG pointer and marks the target with a temporary visual grab attribute, then follows a second Bezier path while the target moves to the requested top-left coordinate.
+
+The element is moved with the CSS individual `translate` property. Its `transform` property is not overwritten; the computed starting translate is composed with the drag offset, while the original inline translate is saved for cancellation. Successful release retains the destination. `stopDrag(id)` cancels and restores the original inline translate.
+
+Each cursor owns one drag timeline, and a renderer-level element lock prevents two cursors from acquiring the same target. Separate cursors may drag separate elements concurrently. Drag start cancels that cursor's in-flight direct/natural movement and click feedback to avoid competing transforms. Removed targets are detected by a container MutationObserver and checked during progress; cursor removal and renderer destruction also cancel and restore active drags. The observer is disconnected on destroy.
+
+Coordinates are CSS pixels relative to the mounted container's content origin, accounting for its border and scroll offset. With reduced motion enabled, a drag completes immediately at its destination. The simulation never dispatches synthetic mouse, pointer, or drag events and does not emulate native browser drag-and-drop data transfer.
