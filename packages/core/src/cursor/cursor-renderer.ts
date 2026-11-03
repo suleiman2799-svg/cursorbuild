@@ -64,6 +64,7 @@ interface TextInsertionRecord {
   text: string;
   baseText: string;
   caretColor: string;
+  clickTimeline?: gsap.core.Timeline;
 }
 interface DragRecord {
   element: HTMLElement;
@@ -393,6 +394,7 @@ export class CursorRenderer {
     const caret = document.createElement("span");
     caret.className = "cursorbuild-typing-caret";
     caret.setAttribute("aria-hidden", "true");
+    caret.style.display = "none";
     caret.style.backgroundColor = this.nodes.get(id)!.color;
     this.overlay.appendChild(caret);
     const typingDuration = interval === undefined ? duration : (interval * characters.length) / 1000;
@@ -418,13 +420,13 @@ export class CursorRenderer {
     const updateText = (count: number) => {
       const value = baseText + characters.slice(0, count).join("");
       if (isInput) element.value = value;
-      else if (textNode) textNode.data = options.text.slice(0, count);
+      else if (textNode) textNode.data = characters.slice(0, count).join("");
       this.positionTypingCaret(id, record, value);
     };
     if (this.reducedMotion || characters.length === 0 || (typingDuration === 0 && delay === 0)) {
       element.focus();
       updateText(characters.length);
-      this.setNaturalPosition(id, this.positionForTypingCaret(record, baseText + options.text));
+      this.setNaturalPosition(id, this.positionForTypingCaret(record, baseText + characters.join("")));
       this.finishTextInsertion(id, record);
       return undefined;
     }
@@ -444,6 +446,7 @@ export class CursorRenderer {
         if (this.activeTextInsertions.get(id) !== record) return;
         element.focus();
         this.click(id, { style: "press", duration: 0.16 });
+        record.clickTimeline = this.clickTimelines.get(id);
         caret.style.display = "block";
       },
       onUpdate: () => {
@@ -600,6 +603,7 @@ export class CursorRenderer {
   private cancelTextInsertionRecord(id: string, record: TextInsertionRecord): void {
     if (this.activeTextInsertions.get(id) !== record) return;
     record.timeline.kill();
+    if (record.clickTimeline && this.clickTimelines.get(id) === record.clickTimeline) { record.clickTimeline.kill(); this.clickTimelines.delete(id); }
     this.restoreTextTarget(record);
     record.caret.remove();
     this.textLocks.delete(record.element);
