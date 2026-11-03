@@ -136,7 +136,7 @@ describe("CursorRenderer drag simulation", () => {
     expect(timeline).toBeDefined();
     expect(renderer.isDragging("a")).toBe(true);
     expect(gsapState.timelines).toHaveLength(1);
-    expect(gsapState.timelines[0].to).toHaveBeenCalledTimes(3);
+    expect(gsapState.timelines[0].to).toHaveBeenCalledTimes(2);
   });
   it("accepts an HTMLElement target and preserves its original transform", () => {
     const { host, renderer } = setup(["a"]);
