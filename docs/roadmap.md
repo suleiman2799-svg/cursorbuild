@@ -21,11 +21,11 @@
 
 ## Interaction primitives
 - [x] Configurable drag/drop simulation with per-cursor timelines and element locking
-- [ ] Element resizing and positioning
+- [ ] Element resizing and positioning (implementation in PR #6 under review)
 - [x] Animated text insertion simulation with caret feedback and target locking
 
 ## Orchestration
-- [ ] Declarative timelines and reusable scroll scenes
+- [x] Declarative scroll-driven construction scenes (PR #8)
 - [ ] Multi-cursor coordination and conflict rules
 - [ ] Responsive scene composition and reduced-motion strategy
 
@@ -34,6 +34,12 @@
 - [ ] API reference and integration examples
 - [ ] Accessibility and performance benchmarks
 - [ ] Release automation
+
+## Cinematic animation engine — implemented in PR #7 (open for review)
+- [x] Directional text, image, and mask reveals
+- [x] Section entrance, parallax, transitions, assembly, and staggered timelines
+- [x] Configurable timing, reverse playback, reduced-motion handling, and cleanup
+- [x] Standalone framework-independent API and responsive demo
 
 ## Scroll-driven construction engine — implemented in PR #8
 - [x] Independent section-based construction scenes
