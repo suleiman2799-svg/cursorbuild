@@ -401,6 +401,7 @@ export class CursorRenderer {
 
     this.stopTextInsertion(id);
     this.stopDrag(id);
+    this.stopResize(id);
     this.naturalMovement.cancel(id);
     this.cancelRendererTween(id);
     this.clickTimelines.get(id)?.kill();
