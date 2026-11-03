@@ -247,9 +247,19 @@ export class CursorRenderer {
 
     const approachControls = getNaturalControlPoints(startCursor, targetCenter, curvature, id);
     const dragControls = getNaturalControlPoints(targetCenter, cursorEnd, curvature, id + ":drag");
+    const pointer = this.nodes.get(id)!.element.querySelector<SVGElement>(".cursorbuild-cursor__button");
+    const setElementOffset = (dx: number, dy: number) => {
+      element.style.translate = `calc(${baseTranslateX} + ${dx}px) calc(${baseTranslateY} + ${dy}px)`;
+    };
+    if (this.reducedMotion || duration === 0) {
+      this.setNaturalPosition(id, cursorEnd);
+      setElementOffset(destination.x - startElement.x, destination.y - startElement.y);
+      if (pointer) gsap.set(pointer, { scale: 1 });
+      return undefined;
+    }
+
     const approach = { value: 0 };
     const progress = { value: 0 };
-    const pointer = this.nodes.get(id)!.element.querySelector<SVGElement>(".cursorbuild-cursor__button");
     const timeline = gsap.timeline();
     const record: DragRecord = {
       element, startElement, timeline, originalTranslate, baseTranslateX, baseTranslateY,
@@ -263,19 +273,8 @@ export class CursorRenderer {
       if (!element.isConnected || !this.container.contains(element)) { this.cancelDragRecord(id, record); return; }
       this.setNaturalPosition(id, point);
     };
-    const setElementOffset = (dx: number, dy: number) => {
-      element.style.translate = `calc(${baseTranslateX} + ${dx}px) calc(${baseTranslateY} + ${dy}px)`;
-    };
     const approachPoint = (t: number) => sampleDragBezier(startCursor, approachControls[0], approachControls[1], targetCenter, t);
     const dragPoint = (t: number) => sampleDragBezier(targetCenter, dragControls[0], dragControls[1], cursorEnd, t);
-
-    if (this.reducedMotion || duration === 0) {
-      setCursor(cursorEnd);
-      setElementOffset(destination.x - startElement.x, destination.y - startElement.y);
-      this.finishDragRecord(id, record, pointer);
-      return undefined;
-    }
-
     const approachDuration = duration * 0.32;
     const dragDuration = duration * 0.68;
     timeline.to(approach, {
@@ -433,6 +432,7 @@ export class CursorRenderer {
     this.positions.set(id, { ...point }); gsap.set(cursor.element, { x: point.x, y: point.y });
   }
   private removeNode(id: string): void {
+    this.stopDrag(id);
     this.naturalMovement.cancel(id);
     this.tweens.get(id)?.kill(); this.tweens.delete(id);
     this.clickTimelines.get(id)?.kill(); this.clickTimelines.delete(id);
