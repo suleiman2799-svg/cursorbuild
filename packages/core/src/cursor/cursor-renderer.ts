@@ -481,6 +481,7 @@ export class CursorRenderer {
     this.mediaQuery?.removeEventListener?.("change", this.handleMotionChange);
     this.mutationObserver.disconnect();
     [...this.activeDrags.entries()].forEach(([id, record]) => this.cancelDragRecord(id, record));
+    [...this.activeTextInsertions.entries()].forEach(([id, record]) => this.cancelTextInsertionRecord(id, record));
     window.removeEventListener("resize", this.handleResize);
     this.tweens.forEach((tween) => tween.kill());
     this.clickTimelines.forEach((timeline) => timeline.kill());
@@ -497,6 +498,7 @@ export class CursorRenderer {
       this.tweens.forEach((tween) => tween.kill()); this.tweens.clear();
       this.positions.forEach((point, id) => { const node = this.nodes.get(id); if (node) gsap.set(node.element, { x: point.x, y: point.y }); });
       this.clickTimelines.forEach((timeline) => timeline.kill()); this.clickTimelines.clear();
+      [...this.activeTextInsertions.entries()].forEach(([id, record]) => this.completeTextInsertion(id, record));
       [...this.activeDrags.entries()].forEach(([id, record]) => {
         const pointer = this.nodes.get(id)?.element.querySelector<SVGElement>(".cursorbuild-cursor__button");
         record.timeline.kill();
@@ -528,6 +530,99 @@ export class CursorRenderer {
     catch { throw new TypeError("Drag target must be a valid CSS selector."); }
     if (!(element instanceof HTMLElement)) throw new Error("Drag selector did not match an HTMLElement inside the mounted container.");
     return element;
+  }
+  private isSupportedTextTarget(element: HTMLElement): boolean {
+    if (element instanceof HTMLTextAreaElement) return true;
+    if (element instanceof HTMLInputElement) return ["text", "search", "email", "url", "tel", "password"].includes(element.type);
+    return element.getAttribute("contenteditable")?.toLowerCase() === "true";
+  }
+  private resolveTextSelector(selector: string): HTMLElement {
+    let element: Element | null;
+    try { element = this.container.querySelector(selector); }
+    catch { throw new TypeError("Text insertion target must be a valid CSS selector."); }
+    if (!(element instanceof HTMLElement)) throw new Error("Text insertion selector did not match an HTMLElement inside the mounted container.");
+    return element;
+  }
+  private positionForTypingCaret(record: TextInsertionRecord, text: string): CursorPoint {
+    const element = record.element;
+    const rect = element.getBoundingClientRect();
+    const containerRect = this.container.getBoundingClientRect();
+    const originX = containerRect.left + this.container.clientLeft - this.container.scrollLeft;
+    const originY = containerRect.top + this.container.clientTop - this.container.scrollTop;
+    const style = window.getComputedStyle(element);
+    let x = rect.left + rect.width - 2;
+    let y = rect.top + rect.height / 2;
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      try {
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        if (context) {
+          context.font = style.font;
+          const lines = element instanceof HTMLTextAreaElement ? text.split("\n") : [text];
+          const lastLine = lines[lines.length - 1] ?? "";
+          x = rect.left + (Number.parseFloat(style.paddingLeft) || 0) + context.measureText(lastLine).width - element.scrollLeft;
+          y = element instanceof HTMLTextAreaElement
+            ? rect.top + (Number.parseFloat(style.paddingTop) || 0) + (lines.length - 1) * (Number.parseFloat(style.lineHeight) || 18) - element.scrollTop
+            : rect.top + rect.height / 2;
+        }
+      } catch { /* Use the target's trailing edge when canvas text metrics are unavailable. */ }
+    } else if (record.textNode) {
+      try {
+        const range = document.createRange();
+        range.setStart(record.textNode, record.textNode.length);
+        range.collapse(true);
+        if (typeof range.getBoundingClientRect === "function") {
+          const caretRect = range.getBoundingClientRect();
+          if (caretRect.width || caretRect.height) { x = caretRect.left; y = caretRect.top + caretRect.height / 2; }
+        }
+      } catch { /* Use the contenteditable target's trailing edge as a fallback. */ }
+    }
+    const fontSize = Number.parseFloat(style.fontSize) || 16;
+    record.caret.style.left = (x - originX) + "px";
+    record.caret.style.top = (y - originY - fontSize / 2) + "px";
+    record.caret.style.height = (Number.parseFloat(style.lineHeight) || fontSize * 1.2) + "px";
+    record.caret.style.backgroundColor = record.caretColor;
+    return { x: x - originX, y: y - originY };
+  }
+  private positionTypingCaret(id: string, record: TextInsertionRecord, text: string): void {
+    this.setNaturalPosition(id, this.positionForTypingCaret(record, text));
+  }
+  private restoreTextTarget(record: TextInsertionRecord): void {
+    if (record.originalValue !== undefined) {
+      (record.element as HTMLInputElement | HTMLTextAreaElement).value = record.originalValue;
+    } else if (record.textNode) {
+      record.textNode.remove();
+      if (record.originalChildren) record.element.appendChild(record.originalChildren);
+    }
+  }
+  private cancelTextInsertionRecord(id: string, record: TextInsertionRecord): void {
+    if (this.activeTextInsertions.get(id) !== record) return;
+    record.timeline.kill();
+    this.restoreTextTarget(record);
+    record.caret.remove();
+    this.textLocks.delete(record.element);
+    this.activeTextInsertions.delete(id);
+  }
+  private finishTextInsertion(id: string, record: TextInsertionRecord): void {
+    if (this.activeTextInsertions.get(id) !== record) return;
+    record.caret.remove();
+    this.textLocks.delete(record.element);
+    this.activeTextInsertions.delete(id);
+  }
+  private completeTextInsertion(id: string, record: TextInsertionRecord): void {
+    if (this.activeTextInsertions.get(id) !== record) return;
+    record.timeline.kill();
+    if (record.originalValue !== undefined) {
+      (record.element as HTMLInputElement | HTMLTextAreaElement).value = record.baseText + record.text;
+    } else if (record.textNode) record.textNode.data = record.text;
+    const point = this.positionForTypingCaret(record, record.baseText + record.text);
+    this.setNaturalPosition(id, point);
+    this.finishTextInsertion(id, record);
+  }
+  private cancelRemovedTextInsertions(): void {
+    [...this.activeTextInsertions.entries()].forEach(([id, record]) => {
+      if (!record.element.isConnected || !this.container.contains(record.element)) this.cancelTextInsertionRecord(id, record);
+    });
   }
   private cancelRemovedDrags(): void {
     [...this.activeDrags.entries()].forEach(([id, record]) => {
@@ -593,6 +688,7 @@ export class CursorRenderer {
   }
   private removeNode(id: string): void {
     this.stopDrag(id);
+    this.stopTextInsertion(id);
     this.naturalMovement.cancel(id);
     this.tweens.get(id)?.kill(); this.tweens.delete(id);
     this.clickTimelines.get(id)?.kill(); this.clickTimelines.delete(id);
