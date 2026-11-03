@@ -15,6 +15,8 @@ export default function App() {
  const rendererRef = useRef<ReturnType<typeof engine.mountCursors> | null>(null);
  const demoTimelineRef = useRef<{ pause: () => void } | null>(null);
  const [nextId, setNextId] = useState(1);
+ const [sceneProgress, setSceneProgress] = useState(0);
+ const [scenePaused, setScenePaused] = useState(false);
  useEffect(() => {
   const stage = stageRef.current; if (!stage) return;
   starterCursors.forEach((cursor) => { if (!engine.cursors.get(cursor.id)) engine.cursors.add(cursor); });
@@ -27,6 +29,18 @@ export default function App() {
   rendererRef.current = renderer;
   const timeline = engine.animations.createTimeline("demo-cursor-loop", { repeat: -1, repeatDelay: 0.25 });
   demoTimelineRef.current = timeline;
+  engine.construction.createScene("demo-scroll-scene", {
+   trigger: "#scroll-scene",
+   start: "top 80%",
+   end: "bottom 20%",
+   scrub: true,
+   onProgress: (progress) => setSceneProgress(Math.round(progress * 100)),
+   steps: [
+    { id: "scroll-title", target: "#scroll-title", from: { opacity: 0, y: 42 }, to: { opacity: 1, y: 0 }, duration: 1 },
+    { id: "scroll-panel", target: "#scroll-panel", from: { opacity: 0, scale: 0.94 }, to: { opacity: 1, scale: 1 }, duration: 1, position: "<" },
+    { id: "scroll-copy", target: "#scroll-copy", from: { opacity: 0, y: 24 }, to: { opacity: 1, y: 0 }, duration: 0.8, position: "<" }
+   ]
+  });
   timeline.call(() => renderer.moveNaturally("maya", pointAt(0.28, 0.4)));
   timeline.call(() => renderer.click("maya"), [], "+=0.7");
   timeline.call(() => renderer.moveNaturally("noah", pointAt(0.65, 0.58)));
@@ -37,7 +51,7 @@ export default function App() {
   timeline.call(() => renderer.moveNaturally("noah", pointAt(0.12, 0.2)));
   timeline.call(() => renderer.moveNaturally("zoe", pointAt(0.78, 0.65)), [], "+=0.4");
   return () => {
-   timeline.kill(); engine.animations.kill("demo-cursor-loop"); demoTimelineRef.current = null; renderer.destroy(); rendererRef.current = null;
+   timeline.kill(); engine.animations.kill("demo-cursor-loop"); engine.construction.killScene("demo-scroll-scene"); demoTimelineRef.current = null; renderer.destroy(); rendererRef.current = null;
    starterCursors.forEach((cursor) => engine.cursors.remove(cursor.id));
   };
  }, [engine]);
@@ -66,6 +80,12 @@ export default function App() {
   renderer.drag("maya", { target: "#drag-card-one", to: { x: Math.max(12, width * 0.56), y: Math.max(12, height * 0.2) }, duration: 1.25, curvature: 0.2 });
   renderer.drag("noah", { target: "#drag-card-two", to: { x: Math.max(12, width * 0.12), y: Math.max(12, height * 0.62) }, duration: 1.45, curvature: 0.16 });
  }
+ function toggleScrollScene() {
+  const scene = engine.construction.getScene("demo-scroll-scene");
+  if (!scene) return;
+  if (scenePaused) scene.resume(); else scene.pause();
+  setScenePaused((value) => !value);
+ }
  return <main className="shell">
   <nav><span className="mark">C</span><span>CURSORBUILD</span><span className="nav-tag">MULTI-CURSOR ENGINE · 0.3</span></nav>
   <section className="hero"><p className="eyebrow">COLLABORATION, IN MOTION</p><h1>Many hands.<br/><em>One canvas.</em></h1>
@@ -83,6 +103,16 @@ export default function App() {
    <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={!cursors.some((cursor) => cursor.id.startsWith("guest-"))}>− Remove cursor</button> <button onClick={replayTextInsertion}>⌨ Replay typing demo</button> <button onClick={replayDrags}>↻ Replay drag demo</button></div></div>
    <div className="cursor-legend">{cursors.map((cursor) => <span className="cursor-chip" key={cursor.id}><i style={{background:cursor.color}}/>{cursor.name}</span>)}</div>
   </section>
-  <footer><span>FOUNDATION + MOVEMENT + CLICK + DRAG + TEXT · v0.4.0</span><span>Visual pointers never intercept page interaction.</span></footer>
+  <section id="scroll-scene" className="panel scroll-panel">
+   <div className="panel-head"><div><p className="eyebrow">SCROLL-DRIVEN CONSTRUCTION</p><h2>Build as you scroll</h2></div><span className="count">{sceneProgress}% COMPLETE</span></div>
+   <div className="scroll-scene-content">
+    <span className="stage-kicker">SCENE / 01 — CONTROLLED BY SCROLL POSITION</span>
+    <h3 id="scroll-title">The page becomes the timeline.</h3>
+    <div id="scroll-panel" className="scroll-feature"><span className="scroll-orbit"/><strong>Scroll to construct</strong><small>One scene · multiple synchronized steps</small></div>
+    <p id="scroll-copy">The heading, feature panel, and supporting copy share one scroll-linked timeline. Scroll upward to reverse the construction.</p>
+   </div>
+   <div className="cursor-controls"><p>SCROLL PROGRESS · {sceneProgress}%</p><div><button onClick={toggleScrollScene}>{scenePaused ? "▶ Resume scene" : "Ⅱ Pause scene"}</button></div></div>
+  </section>
+  <footer><span>FOUNDATION + MOVEMENT + CLICK + DRAG + TEXT + SCROLL · v0.5.0</span><span>Construction scenes are independent from cursor rendering.</span></footer>
  </main>;
 }
