@@ -2,7 +2,7 @@ import { gsap } from "gsap";
 import type { CursorManager } from "./cursor-manager.js";
 import type { CursorIdentity } from "../types.js";
 import { NaturalCursorMovementEngine } from "./natural-cursor-movement.js";
-import type { NaturalMovementOptions, NaturalMovementStep } from "./natural-cursor-movement.js";
+import type { NaturalMoveOptions, NaturalMovementOptions, NaturalMovementStep } from "./natural-cursor-movement.js";
 
 export interface CursorPoint { x: number; y: number; }
 export interface CursorRendererOptions {
@@ -30,7 +30,7 @@ export class CursorRenderer {
   private readonly tweens = new Map<string, gsap.core.Tween>();
   private readonly pulses = new Map<string, gsap.core.Timeline>();
   private readonly unsubscribe: () => void;
-  private readonly options: Required<Omit<CursorRendererOptions, "initialPositions">>;
+  private readonly options: Required<Omit<CursorRendererOptions, "initialPositions" | "naturalMovement">>;
   private readonly initialPositions: Record<string, CursorPoint>;
   private readonly originalPosition: string;
   private readonly changedContainerPosition: boolean;
@@ -111,7 +111,7 @@ export class CursorRenderer {
   }
 
   /** Move one cursor along a natural curved path with configurable GSAP easing. */
-  moveNaturally(id: string, point: CursorPoint, options: Omit<NaturalMovementStep, "pauseAfter"> = {}): gsap.core.Timeline | undefined {
+  moveNaturally(id: string, point: CursorPoint, options: NaturalMoveOptions = {}): gsap.core.Timeline | undefined {
     this.assertActive();
     this.cancelRendererTween(id);
     return this.naturalMovement.moveTo(id, point, options);
