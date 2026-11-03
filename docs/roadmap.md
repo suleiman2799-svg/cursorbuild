@@ -21,11 +21,11 @@
 
 ## Interaction primitives
 - [x] Configurable drag/drop simulation with per-cursor timelines and element locking
-- [ ] Element resizing and positioning
+- [ ] Element resizing and positioning (implementation under review in PR #6)
 - [x] Animated text insertion simulation with caret feedback and target locking
 
 ## Orchestration
-- [ ] Declarative timelines and reusable scroll scenes
+- [x] Declarative scroll-driven construction scenes (PR #9)
 - [x] Multi-cursor coordination and dependency/cancellation rules (PR #9)
 - [ ] Responsive scene composition and reduced-motion strategy
 
@@ -35,7 +35,19 @@
 - [ ] Accessibility and performance benchmarks
 - [ ] Release automation
 
-## Multi-cursor coordination engine — implemented in PR #9
+## Cinematic animation engine — implemented in PR #7 (open for review)
+- [x] Directional text, image, and mask reveals
+- [x] Section entrance, parallax, transitions, assembly, and staggered timelines
+- [x] Configurable timing, reversible GSAP timelines, reduced-motion handling, and cleanup
+- [x] Standalone framework-independent API and responsive demo
+
+## Scroll-driven construction engine — implemented in PR #9
+- [x] Independent section-based construction scenes and GSAP timelines
+- [x] Configurable scroll boundaries, sequential/simultaneous actions, and progress tracking
+- [x] Pause/resume, reverse-on-scroll-up, multiple scenes, and cleanup
+- [x] Reduced-motion completion and responsive demo
+
+## Multi-cursor coordination engine — implemented in PR #10
 - [x] Parallel and sequential collaborator action groups
 - [x] Explicit dependency graph with cycle and missing-dependency validation
 - [x] Cursor-scoped action contexts and AbortSignal propagation
