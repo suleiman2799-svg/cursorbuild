@@ -17,19 +17,20 @@ export default function App() {
  useEffect(() => {
   const stage = stageRef.current; if (!stage) return;
   starterCursors.forEach((cursor) => { if (!engine.cursors.get(cursor.id)) engine.cursors.add(cursor); });
+  const pointAt = (x: number, y: number) => ({ x: Math.max(8, Math.min(stage.clientWidth - 145, stage.clientWidth * x)), y: Math.max(8, Math.min(stage.clientHeight - 45, stage.clientHeight * y)) });
   const renderer = engine.mountCursors(stage, { duration: 0.85, initialPositions: {
-   maya: { x: 42, y: 72 }, noah: { x: 280, y: 130 }, zoe: { x: 470, y: 65 }
+   maya: pointAt(0.08, 0.18), noah: pointAt(0.48, 0.32), zoe: pointAt(0.72, 0.14)
   }});
   rendererRef.current = renderer;
   const timeline = engine.animations.createTimeline("demo-cursor-loop", { repeat: -1, repeatDelay: 0.25 });
-  timeline.call(() => renderer.moveTo("maya", { x: 165, y: 145 }));
+  timeline.call(() => renderer.moveTo("maya", pointAt(0.28, 0.4)));
   timeline.call(() => renderer.click("maya"), [], "+=0.7");
-  timeline.call(() => renderer.moveTo("noah", { x: 390, y: 205 }));
+  timeline.call(() => renderer.moveTo("noah", pointAt(0.65, 0.58)));
   timeline.call(() => renderer.click("noah"), [], "+=0.55");
-  timeline.call(() => renderer.moveTo("zoe", { x: 220, y: 255 }));
-  timeline.call(() => renderer.moveTo("maya", { x: 510, y: 110 }), [], "+=0.5");
-  timeline.call(() => renderer.moveTo("noah", { x: 95, y: 85 }));
-  timeline.call(() => renderer.moveTo("zoe", { x: 520, y: 230 }), [], "+=0.4");
+  timeline.call(() => renderer.moveTo("zoe", pointAt(0.32, 0.72)));
+  timeline.call(() => renderer.moveTo("maya", pointAt(0.76, 0.26)), [], "+=0.5");
+  timeline.call(() => renderer.moveTo("noah", pointAt(0.12, 0.2)));
+  timeline.call(() => renderer.moveTo("zoe", pointAt(0.78, 0.65)), [], "+=0.4");
   return () => {
    timeline.kill(); engine.animations.kill("demo-cursor-loop"); renderer.destroy(); rendererRef.current = null;
    starterCursors.forEach((cursor) => engine.cursors.remove(cursor.id));
@@ -38,7 +39,7 @@ export default function App() {
  function addCursor() {
   const palette = ["#f6bd60", "#69b7ff", "#d78bff", "#ff9f7a"]; const id = "guest-" + nextId;
   engine.cursors.add({ id, name: "Guest " + nextId, color: palette[(nextId - 1) % palette.length] });
-  rendererRef.current?.moveTo(id, { x: 70 + (nextId % 4) * 95, y: 75 + (nextId % 3) * 60 }, 0);
+  rendererRef.current?.moveTo(id, { x: Math.max(8, Math.min((stageRef.current?.clientWidth ?? 300) - 145, 28 + (nextId % 4) * 48)), y: 45 + (nextId % 3) * 54 }, 0);
   setNextId((value) => value + 1);
  }
  function removeCursor() {
