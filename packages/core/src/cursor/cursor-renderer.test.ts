@@ -474,9 +474,11 @@ describe("CursorRenderer element resizing simulation", () => {
       target.style.transform = "none";
       target.style.translate = "12px 4px";
       const measure = () => {
-        const parts = target.style.translate.split(/\s+/);
-        const tx = readTranslate(parts[0] || "0px");
-        const ty = readTranslate(parts[1] || "0px");
+        const translated = target.style.translate;
+        const composed = translated.match(/^calc\(([-\d.]+)px \+ ([-\d.]+)px\) calc\(([-\d.]+)px \+ ([-\d.]+)px\)$/);
+        const parts = translated.split(/\s+/);
+        const tx = composed ? Number(composed[1]) + Number(composed[2]) : readTranslate(parts[0] || "0px");
+        const ty = composed ? Number(composed[3]) + Number(composed[4]) : readTranslate(parts[1] || "0px");
         const left = 10 + tx, top = 20 + ty;
         const width = Number.parseFloat(target.style.width);
         const height = Number.parseFloat(target.style.height);
