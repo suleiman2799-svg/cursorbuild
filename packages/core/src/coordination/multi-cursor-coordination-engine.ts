@@ -217,7 +217,7 @@ export class CoordinatedActionGroup {
           const dependencyStatus = this.actions.get(dependency)!.status;
           if (dependencyStatus !== "completed") throw abortError();
         }
-        if (this.groupController.signal.aborted || action.status === "cancelled") throw abortError();
+        if (this.groupController.signal.aborted || isActionCancelled(action)) throw abortError();
         const controller = new AbortController();
         action.controller = controller;
         const abortFromGroup = () => controller.abort();
