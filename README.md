@@ -2,7 +2,7 @@
 
 **CursorBuild** is an open-source, modular foundation for scroll-driven, multi-cursor website construction animations.
 
-> **Status: early development (v0.2.0).** The foundation and multiple-cursor rendering/movement primitives are implemented. Drag/drop, resizing, text insertion, and full cinematic construction sequences remain planned.
+> **Status: early development (v0.3.0).** The foundation, multiple-cursor rendering, natural movement, and configurable visual click feedback are implemented. Drag/drop, resizing, text insertion, and full cinematic construction sequences remain planned.
 
 ## Technology stack
 - **TypeScript** — framework-agnostic core
@@ -36,40 +36,52 @@ const engine = new CursorBuildEngine();
 engine.cursors.add({ id: "designer", name: "Maya · Design", color: "#a78bfa" });
 const renderer = engine.mountCursors(document.querySelector<HTMLElement>("#canvas")!);
 renderer.moveTo("designer", { x: 180, y: 120 });
-renderer.click("designer"); // visual pulse only; does not dispatch a DOM click
+renderer.click("designer"); // visual feedback only; never dispatches a DOM click
 // engine.destroy() disposes renderers and GSAP resources.
 ~~~
 
-Coordinates are CSS pixels relative to the mounted container. The overlay uses pointer-events: none and never captures input. Visible cursor count is capped by viewport width (desktop 8, tablet 3, mobile 2 by default). Reduced-motion preferences disable movement tweening and click pulses.
+Coordinates are CSS pixels relative to the mounted container. The overlay and cursor elements use pointer-events: none and never capture input. Visible cursor count is capped by viewport width (desktop 8, tablet 3, mobile 2 by default).
 
 ## Natural cursor movement
 
-The renderer exposes natural movement without changing the existing `moveTo()` API. Each cursor gets its own GSAP timeline, so multiple identities can travel at the same time.
+The renderer exposes natural movement without changing the existing `moveTo()` API. Each cursor gets its own GSAP timeline.
 
-```ts
-// One curved movement; duration is seconds and easing accepts GSAP ease names.
+~~~ts
 renderer.moveNaturally("designer", { x: 420, y: 180 }, {
-  duration: 1.1,
-  ease: "power3.inOut",
-  curvature: 0.2
+  duration: 1.1, ease: "power3.inOut", curvature: 0.2
 });
-
-// A route with a natural pause between destinations.
 renderer.moveSequence("designer", [
   { to: { x: 180, y: 120 }, duration: 0.8 },
   { to: { x: 360, y: 240 }, pauseAfter: 0.35 },
   { to: { x: 520, y: 100 } }
-], {
-  duration: 0.9,
-  ease: "power2.inOut",
-  pauseBetween: [0.15, 0.45]
+], { pauseBetween: [0.15, 0.45] });
+renderer.stopNaturalMovement("designer");
+~~~
+
+Curvature ranges from 0 (straight) to 1 (strong arc). Pauses accept seconds or a [minimum, maximum] range. Coordinates remain container-relative CSS pixels.
+
+## Configurable click feedback
+
+`click()` remains backward compatible: `renderer.click("designer")` plays the default press-and-release plus ripple animation. Configure renderer-wide defaults or override them for an individual click:
+
+~~~ts
+const renderer = engine.mountCursors(canvas, {
+  clickFeedback: {
+    duration: 0.36,       // total animation time, seconds
+    rippleSize: 2.2,      // final scale multiplier
+    intensity: 0.75,      // ripple opacity, 0–1
+    style: "ripple-press" // "ripple" | "press" | "ripple-press"
+  }
 });
 
-// Stop only this cursor's natural route.
-renderer.stopNaturalMovement("designer");
-```
+renderer.click("designer");
+renderer.click("designer", { style: "ripple", rippleSize: 2.8 });
+renderer.click("designer-2", { style: "press", duration: 0.24 });
+~~~
 
-`curvature` ranges from 0 (straight) to 1 (strong arc); the default is 0.18. `duration` defaults to the renderer's configured duration, and `ease` defaults to its configured easing. `pauseBetween` accepts seconds or a [minimum, maximum] range; an individual step's `pauseAfter` overrides it. Coordinates remain CSS pixels relative to the mounted container, so movement paths work with the renderer's responsive layout. When reduced motion is requested, routes snap to their final destination without tweening or pauses. Existing `moveTo()`, click feedback, visibility limits, and renderer cleanup remain supported.
+Defaults are 0.32 seconds, ripple scale 2.15, intensity 0.72, and combined press/ripple style. A press compresses and releases the SVG pointer; a ripple animates the existing halo node, so no temporary DOM elements are created. Each cursor owns an independent click timeline. A new click replaces only that same cursor's active click animation. Click feedback is visual only and never triggers page interaction.
+
+When `prefers-reduced-motion: reduce` is active and `respectReducedMotion` is enabled (the default), click animations are suppressed and movement snaps to its destination. Set `respectReducedMotion: false` only when your application has an explicit alternative accessibility strategy.
 
 ## Getting started
 
@@ -82,7 +94,7 @@ npm run dev
 
 ## Continuous integration
 
-GitHub Actions runs the unit tests, TypeScript checks, and production build on pushes to development branches and pull requests targeting main.
+GitHub Actions runs unit tests, TypeScript checks, and the production build on pushes to development branches and pull requests targeting main.
 
 ## Development commands
 ~~~bash
@@ -94,15 +106,17 @@ npm run typecheck
 
 ## Roadmap
 1. **Foundation:** engine lifecycle, configuration, cursor registry, GSAP/ScrollTrigger managers, action sequencing, React integration, demo, and tests.
-2. **Cursor rendering and natural movement (current):** multiple DOM cursors, identity labels/colors, direct and curved movement, configurable easing/duration, optional pauses, click pulse, responsive visibility, and reduced-motion support.
-3. **Interaction primitives:** richer click feedback, drag/drop, resizing, positioning, and animated text insertion.
+2. **Cursor rendering and motion (current):** multiple DOM cursors, direct and curved movement, configurable easing/duration, click press/ripple feedback, responsive visibility, and reduced-motion support.
+3. **Interaction primitives:** drag/drop, resizing, positioning, and animated text insertion.
 4. **Orchestration:** declarative timelines, multi-cursor coordination, responsive scenes, and reduced-motion behaviour.
 5. **Production readiness:** browser integration tests, accessibility/performance validation, API documentation, and release automation.
 
 See docs/architecture.md and docs/roadmap.md for implementation boundaries and future work.
 
 ## Contributing
+
 Issues and pull requests are welcome. Keep the core framework-independent and add tests for new behaviour.
 
 ## License
+
 MIT — see LICENSE.
