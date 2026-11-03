@@ -4,15 +4,20 @@ import { CursorManager } from "./cursor/cursor-manager.js";
 import { CursorRenderer } from "./cursor/cursor-renderer.js";
 import type { CursorRendererOptions } from "./cursor/cursor-renderer.js";
 import { ScrollManager } from "./scroll/scroll-manager.js";
+import { MultiCursorCoordinator } from "./coordination/multi-cursor-coordinator.js";
 import type { CursorBuildConfig } from "./types.js";
 export class CursorBuildEngine {
  readonly config: CursorBuildConfig;
  readonly cursors = new CursorManager();
  readonly animations = new AnimationManager();
  readonly scroll = new ScrollManager();
+ readonly coordination: MultiCursorCoordinator;
  private readonly cursorRenderers = new Set<CursorRenderer>();
  private destroyed = false;
- constructor(config: Partial<CursorBuildConfig> = {}) { this.config = resolveConfig(config); }
+ constructor(config: Partial<CursorBuildConfig> = {}) {
+  this.config = resolveConfig(config);
+  this.coordination = new MultiCursorCoordinator();
+ }
  /** Attach a visual cursor layer. Coordinates are container-relative CSS pixels. */
  mountCursors(container: HTMLElement, options: CursorRendererOptions = {}): CursorRenderer {
   if (this.destroyed) throw new Error("CursorBuildEngine has been destroyed.");
@@ -28,5 +33,6 @@ export class CursorBuildEngine {
   this.cursorRenderers.clear();
   this.animations.killAll();
   this.scroll.killAll();
+  this.coordination.destroy();
  }
 }
