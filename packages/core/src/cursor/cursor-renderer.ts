@@ -101,12 +101,14 @@ export class CursorRenderer {
   /** Move one cursor along a natural curved path with configurable GSAP easing. */
   moveNaturally(id: string, point: CursorPoint, options: Omit<NaturalMovementStep, "pauseAfter"> = {}): gsap.core.Timeline | undefined {
     this.assertActive();
+    this.cancelRendererTween(id);
     return this.naturalMovement.moveTo(id, point, options);
   }
 
   /** Move one cursor through multiple curved destinations, with optional pauses between them. */
   moveSequence(id: string, steps: NaturalMovementStep[], options: NaturalMovementOptions = {}): gsap.core.Timeline | undefined {
     this.assertActive();
+    this.cancelRendererTween(id);
     return this.naturalMovement.playSequence(id, steps, options);
   }
 
@@ -201,6 +203,11 @@ export class CursorRenderer {
       if (shape) shape.setAttribute("fill", identity.color);
       cursor.label.style.backgroundColor = identity.color;
     }
+  }
+
+  private cancelRendererTween(id: string): void {
+    this.tweens.get(id)?.kill();
+    this.tweens.delete(id);
   }
 
   private setNaturalPosition(id: string, point: CursorPoint): void {
