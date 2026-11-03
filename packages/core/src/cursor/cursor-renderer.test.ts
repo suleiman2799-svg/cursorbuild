@@ -49,7 +49,7 @@ describe("CursorRenderer", () => {
     renderer.moveTo("a", { x: 50, y: 60 }, 0);
     expect(renderer.getPosition("a")).toEqual({ x: 50, y: 60 });
   });
-\n  it("restores container positioning and removes overlay on destroy", () => {
+  it("restores container positioning and removes overlay on destroy", () => {
     const manager = new CursorManager(); const host = document.createElement("div"); document.body.append(host);
     const renderer = new CursorRenderer(manager, host); renderers.push(renderer);
     expect(host.style.position).toBe("relative"); renderer.destroy();
