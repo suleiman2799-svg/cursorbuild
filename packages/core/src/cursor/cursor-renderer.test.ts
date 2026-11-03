@@ -437,17 +437,49 @@ describe("CursorRenderer element resizing simulation", () => {
     expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
   });
 
-  it("cancels and restores exact original inline dimensions and removes temporary handles", () => {
+  it("cancels and restores exact original inline dimensions, translate, and temporary handles", () => {
     const { host, renderer } = setup(["a"]);
     const target = addResizeTarget(host);
-    renderer.resize("a", { target, to: { width: 240, height: 170 } });
+    target.style.translate = "12px 4px";
+    renderer.resize("a", { target, to: { width: 240, height: 170 }, handle: "top-left" });
     renderer.stopResize("a");
     expect(target.style.width).toBe("100px");
     expect(target.style.height).toBe("80px");
+    expect(target.style.translate).toBe("12px 4px");
     expect(target.style.transform).toBe("rotate(4deg)");
     expect(renderer.isResizing("a")).toBe(false);
     expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
     expect(gsapState.timelines[0].kill).toHaveBeenCalled();
+  });
+
+  it("keeps the opposite edge or corner anchored for every resize handle", () => {
+    const cases = [
+      ["top-left", -20, -10],
+      ["top", 0, -10],
+      ["top-right", 0, -10],
+      ["right", 0, 0],
+      ["bottom-right", 0, 0],
+      ["bottom", 0, 0],
+      ["bottom-left", -20, 0],
+      ["left", -20, 0]
+    ] as const;
+    cases.forEach(([handle, expectedX, expectedY]) => {
+      const { host, renderer } = setup(["a"]);
+      const target = addResizeTarget(host);
+      target.style.translate = "12px 4px";
+      renderer.resize("a", { target, to: { width: 140, height: 100 }, handle });
+      const resizeTween = gsapState.timelines[gsapState.timelines.length - 1].to.mock.calls[1];
+      resizeTween[0].value = 0.5;
+      resizeTween[1].onUpdate();
+      const dx = expectedX === 0 ? 0 : expectedX;
+      const dy = expectedY === 0 ? 0 : expectedY;
+      expect(target.style.translate).toBe(`calc(12px + ${dx}px) calc(4px + ${dy}px)`);
+      expect(target.style.transform).toBe("rotate(4deg)");
+      renderer.stopResize("a");
+      expect(target.style.translate).toBe("12px 4px");
+      expect(target.style.width).toBe("100px");
+      expect(target.style.height).toBe("80px");
+    });
   });
 
   it("rejects invalid dimensions, selectors, durations, and curvature", () => {
