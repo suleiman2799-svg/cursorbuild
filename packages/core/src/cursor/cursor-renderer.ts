@@ -45,6 +45,10 @@ export class CursorRenderer {
       mobileMaxVisible: options.mobileMaxVisible ?? 2,
       respectReducedMotion: options.respectReducedMotion ?? true
     };
+    if (!Number.isFinite(this.options.duration) || this.options.duration < 0) throw new RangeError("duration must be finite and non-negative.");
+    for (const limit of [this.options.maxVisible, this.options.tabletMaxVisible, this.options.mobileMaxVisible]) {
+      if (!Number.isInteger(limit) || limit < 0) throw new RangeError("Visible cursor limits must be non-negative integers.");
+    }
     this.initialPositions = options.initialPositions ?? {};
     this.mediaQuery = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : undefined;
     this.reducedMotion = this.options.respectReducedMotion && !!this.mediaQuery?.matches;
@@ -74,6 +78,7 @@ export class CursorRenderer {
     this.assertActive();
     if (!this.nodes.has(id)) throw new Error("Unknown rendered cursor: " + id);
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new TypeError("Cursor coordinates must be finite numbers.");
+    if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Movement duration must be finite and non-negative.");
     this.positions.set(id, { ...point });
     const node = this.nodes.get(id)!.element;
     this.tweens.get(id)?.kill();
@@ -158,7 +163,8 @@ export class CursorRenderer {
       this.nodes.set(identity.id, cursor);
       this.overlay.appendChild(element);
       const initial = this.initialPositions[identity.id] ?? { x: 24 + (index % 4) * 38, y: 28 + (index % 3) * 32 };
-      this.positions.set(identity.id, initial);
+      if (!Number.isFinite(initial.x) || !Number.isFinite(initial.y)) throw new TypeError("Initial cursor coordinates must be finite numbers.");
+      this.positions.set(identity.id, { ...initial });
       gsap.set(element, { x: initial.x, y: initial.y });
     }
     if (cursor.name !== identity.name) { cursor.name = identity.name; cursor.label.textContent = identity.name; }
