@@ -564,16 +564,19 @@ export class CursorRenderer {
     const translateParts = computedTranslate && computedTranslate !== "none" ? computedTranslate.split(/\\s+/) : [];
     const baseTranslateX = translateParts[0] || "0px";
     const baseTranslateY = translateParts[1] || "0px";
+    const baseTranslateZ = translateParts[2];
+    const composeTranslate = (dx: number, dy: number) =>
+      `calc(${baseTranslateX} + ${dx}px) calc(${baseTranslateY} + ${dy}px)${baseTranslateZ ? " " + baseTranslateZ : ""}`;
     const setAnchorOffset = (width: number, height: number) => {
       const dx = handle.includes("left") ? startBoxWidth - width : 0;
       const dy = handle.includes("top") ? startBoxHeight - height : 0;
-      element.style.translate = `calc(${baseTranslateX} + ${dx}px) calc(${baseTranslateY} + ${dy}px)`;
+      element.style.translate = dx === 0 && dy === 0 ? originalTranslate : composeTranslate(dx, dy);
     };
-    const cssTargetTranslate = (() => {
-      const dx = handle.includes("left") ? startBoxWidth - options.to.width : 0;
-      const dy = handle.includes("top") ? startBoxHeight - options.to.height : 0;
-      return `calc(${baseTranslateX} + ${dx}px) calc(${baseTranslateY} + ${dy}px)`;
-    })();
+    const targetOffsetX = handle.includes("left") ? startBoxWidth - options.to.width : 0;
+    const targetOffsetY = handle.includes("top") ? startBoxHeight - options.to.height : 0;
+    const cssTargetTranslate = targetOffsetX === 0 && targetOffsetY === 0
+      ? originalTranslate
+      : composeTranslate(targetOffsetX, targetOffsetY);
     const frame = document.createElement("div");
     frame.className = "cursorbuild-resize-frame"; frame.setAttribute("aria-hidden","true");
     RESIZE_HANDLES.forEach((name)=>{
