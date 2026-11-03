@@ -58,13 +58,12 @@ describe("ScrollConstructionEngine", () => {
     vars.onUpdate({ progress: 0.65 });
     expect(scene.progress).toBe(0.65);
     expect(mocks.timeline.progress).toHaveBeenLastCalledWith(0.65);
-    expect(onProgress).not.toHaveBeenCalled();
+    expect(onProgress).toHaveBeenCalledWith(0.65);
   });
 
-  it("reports progress and supports non-reversing scenes", () => {
+  it("supports forward-only scenes without moving backwards", () => {
     const engine = new ScrollConstructionEngine();
-    const onProgress = vi.fn();
-    engine.createScene("forward-only", { trigger: document.createElement("section"), reverse: false, onProgress }, () => {});
+    engine.createScene("forward-only", { trigger: document.createElement("section"), reverse: false }, () => {});
     const vars = mocks.create.mock.calls[0]?.[0] as unknown as { onUpdate: (self: { progress: number }) => void };
     vars.onUpdate({ progress: 0.7 });
     vars.onUpdate({ progress: 0.2 });
