@@ -18,6 +18,17 @@ export interface CursorClickFeedbackOptions {
   style?: CursorClickStyle;
 }
 export type DragTarget = string | HTMLElement;
+export type TextInsertionTarget = string | HTMLInputElement | HTMLTextAreaElement;
+export type TextInsertionMode = "append" | "replace";
+export interface CursorTextInsertionOptions {
+  target: TextInsertionTarget;
+  text: string;
+  duration?: number;
+  characterIntervalMs?: number;
+  initialDelay?: number;
+  mode?: TextInsertionMode;
+  curvature?: number;
+}
 export interface CursorDragOptions {
   /** CSS selector or an element contained by the mounted container. */
   target: DragTarget;
@@ -43,6 +54,17 @@ export interface CursorRendererOptions {
   clickFeedback?: CursorClickFeedbackOptions;
 }
 interface CursorNode { element: HTMLDivElement; label: HTMLSpanElement; color: string; name: string; }
+interface TextInsertionRecord {
+  element: HTMLElement;
+  timeline: gsap.core.Timeline;
+  caret: HTMLSpanElement;
+  originalValue?: string;
+  originalChildren?: DocumentFragment;
+  textNode?: Text;
+  text: string;
+  baseText: string;
+  caretColor: string;
+}
 interface DragRecord {
   element: HTMLElement;
   startElement: CursorPoint;
@@ -78,6 +100,8 @@ export class CursorRenderer {
   private readonly dragTimelines = new Map<string, gsap.core.Timeline>();
   private readonly activeDrags = new Map<string, DragRecord>();
   private readonly dragLocks = new Map<HTMLElement, string>();
+  private readonly activeTextInsertions = new Map<string, TextInsertionRecord>();
+  private readonly textLocks = new Map<HTMLElement, string>();
   private readonly mutationObserver: MutationObserver;
   private readonly unsubscribe: () => void;
   private readonly options: Required<Omit<CursorRendererOptions, "initialPositions" | "naturalMovement" | "clickFeedback">>;
@@ -126,7 +150,7 @@ export class CursorRenderer {
     }, { duration: this.options.duration, ease: this.options.ease, ...options.naturalMovement });
 
     this.unsubscribe = manager.subscribe(() => this.sync());
-    this.mutationObserver = new MutationObserver(() => this.cancelRemovedDrags());
+    this.mutationObserver = new MutationObserver(() => { this.cancelRemovedDrags(); this.cancelRemovedTextInsertions(); });
     this.mutationObserver.observe(container, { childList: true, subtree: true });
     this.mediaQuery?.addEventListener?.("change", this.handleMotionChange);
     window.addEventListener("resize", this.handleResize, { passive: true });
@@ -220,9 +244,12 @@ export class CursorRenderer {
     if (!(element instanceof HTMLElement) || element === this.container || !this.container.contains(element)) {
       throw new Error("Drag target must be an HTMLElement contained by the mounted container.");
     }
+    const textOwner = this.textLocks.get(element);
+    if (textOwner && textOwner !== id) throw new Error("Target is being used by text insertion cursor: " + textOwner);
     const owner = this.dragLocks.get(element);
     if (owner && owner !== id) throw new Error("Drag target is already being dragged by cursor: " + owner);
     this.stopDrag(id);
+    this.stopTextInsertion(id);
     this.naturalMovement.cancel(id);
     this.cancelRendererTween(id);
     this.clickTimelines.get(id)?.kill();
