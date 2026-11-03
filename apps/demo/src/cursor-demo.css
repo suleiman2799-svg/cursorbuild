@@ -23,3 +23,10 @@
 .drag-card small{display:block;margin-top:7px;color:#aaa5b6;font-size:9px}
 .cursor-controls button:last-child{border-color:#7668aa}
 @media(max-width:600px){.drag-card-row{gap:8px}.drag-card{padding:10px;min-height:94px}}
+
+#typing-heading{min-height:1.2em;outline:none;border-radius:4px}
+#typing-heading:focus{ text-shadow:0 0 22px rgba(169,155,255,.24)}
+.typing-field{display:flex;flex-direction:column;gap:7px;max-width:360px;margin-top:18px}
+.typing-field span{font:10px 'DM Mono',monospace;letter-spacing:.13em;color:#a99bff}
+.typing-field input{width:100%;box-sizing:border-box;border:1px solid #514a64;border-radius:8px;background:rgba(255,255,255,.055);padding:12px 13px;color:#f5f1ff;font:13px Inter,ui-sans-serif,system-ui,sans-serif;outline:none}
+.typing-field input:focus{border-color:#a99bff;box-shadow:0 0 0 3px rgba(169,155,255,.12)}

@@ -18,6 +18,17 @@ export interface CursorClickFeedbackOptions {
   style?: CursorClickStyle;
 }
 export type DragTarget = string | HTMLElement;
+export type TextInsertionTarget = string | HTMLElement;
+export type TextInsertionMode = "append" | "replace";
+export interface CursorTextInsertionOptions {
+  target: TextInsertionTarget;
+  text: string;
+  duration?: number;
+  characterIntervalMs?: number;
+  initialDelay?: number;
+  mode?: TextInsertionMode;
+  curvature?: number;
+}
 export interface CursorDragOptions {
   /** CSS selector or an element contained by the mounted container. */
   target: DragTarget;
@@ -43,6 +54,18 @@ export interface CursorRendererOptions {
   clickFeedback?: CursorClickFeedbackOptions;
 }
 interface CursorNode { element: HTMLDivElement; label: HTMLSpanElement; color: string; name: string; }
+interface TextInsertionRecord {
+  element: HTMLElement;
+  timeline: gsap.core.Timeline;
+  caret: HTMLSpanElement;
+  originalValue?: string;
+  originalChildren?: DocumentFragment;
+  textNode?: Text;
+  text: string;
+  baseText: string;
+  caretColor: string;
+  clickTimeline?: gsap.core.Timeline;
+}
 interface DragRecord {
   element: HTMLElement;
   startElement: CursorPoint;
@@ -78,6 +101,8 @@ export class CursorRenderer {
   private readonly dragTimelines = new Map<string, gsap.core.Timeline>();
   private readonly activeDrags = new Map<string, DragRecord>();
   private readonly dragLocks = new Map<HTMLElement, string>();
+  private readonly activeTextInsertions = new Map<string, TextInsertionRecord>();
+  private readonly textLocks = new Map<HTMLElement, string>();
   private readonly mutationObserver: MutationObserver;
   private readonly unsubscribe: () => void;
   private readonly options: Required<Omit<CursorRendererOptions, "initialPositions" | "naturalMovement" | "clickFeedback">>;
@@ -126,7 +151,7 @@ export class CursorRenderer {
     }, { duration: this.options.duration, ease: this.options.ease, ...options.naturalMovement });
 
     this.unsubscribe = manager.subscribe(() => this.sync());
-    this.mutationObserver = new MutationObserver(() => this.cancelRemovedDrags());
+    this.mutationObserver = new MutationObserver(() => { this.cancelRemovedDrags(); this.cancelRemovedTextInsertions(); });
     this.mutationObserver.observe(container, { childList: true, subtree: true });
     this.mediaQuery?.addEventListener?.("change", this.handleMotionChange);
     window.addEventListener("resize", this.handleResize, { passive: true });
@@ -138,6 +163,8 @@ export class CursorRenderer {
     if (!this.nodes.has(id)) throw new Error("Unknown rendered cursor: " + id);
     if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) throw new TypeError("Cursor coordinates must be finite numbers.");
     if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Movement duration must be finite and non-negative.");
+    this.stopTextInsertion(id);
+    this.stopDrag(id);
     this.naturalMovement.cancel(id);
     this.positions.set(id, { ...point });
     const node = this.nodes.get(id)!.element;
@@ -148,10 +175,10 @@ export class CursorRenderer {
   }
 
   moveNaturally(id: string, point: CursorPoint, options: NaturalMoveOptions = {}): gsap.core.Timeline | undefined {
-    this.assertActive(); this.cancelRendererTween(id); return this.naturalMovement.moveTo(id, point, options);
+    this.assertActive(); this.stopTextInsertion(id); this.stopDrag(id); this.cancelRendererTween(id); return this.naturalMovement.moveTo(id, point, options);
   }
   moveSequence(id: string, steps: NaturalMovementStep[], options: NaturalMovementOptions = {}): gsap.core.Timeline | undefined {
-    this.assertActive(); this.cancelRendererTween(id); return this.naturalMovement.playSequence(id, steps, options);
+    this.assertActive(); this.stopTextInsertion(id); this.stopDrag(id); this.cancelRendererTween(id); return this.naturalMovement.playSequence(id, steps, options);
   }
   stopNaturalMovement(id: string): void { this.assertActive(); this.naturalMovement.cancel(id); }
 
@@ -220,9 +247,12 @@ export class CursorRenderer {
     if (!(element instanceof HTMLElement) || element === this.container || !this.container.contains(element)) {
       throw new Error("Drag target must be an HTMLElement contained by the mounted container.");
     }
+    const textOwner = this.textLocks.get(element);
+    if (textOwner && textOwner !== id) throw new Error("Target is being used by text insertion cursor: " + textOwner);
     const owner = this.dragLocks.get(element);
     if (owner && owner !== id) throw new Error("Drag target is already being dragged by cursor: " + owner);
     this.stopDrag(id);
+    this.stopTextInsertion(id);
     this.naturalMovement.cancel(id);
     this.cancelRendererTween(id);
     this.clickTimelines.get(id)?.kill();
@@ -310,6 +340,146 @@ export class CursorRenderer {
     return this.activeDrags.has(id);
   }
 
+  /**
+   * Visually focus a supported text target and insert plain text progressively.
+   * No keyboard or input events are dispatched.
+   */
+  typeText(id: string, options: CursorTextInsertionOptions): gsap.core.Timeline | undefined {
+    this.assertActive();
+    if (!this.nodes.has(id)) throw new Error("Unknown rendered cursor: " + id);
+    if (!options || typeof options.text !== "string") throw new TypeError("Text insertion requires a string.");
+    if (!options.target) throw new TypeError("A text insertion target is required.");
+    const duration = options.duration ?? 1.8;
+    const interval = options.characterIntervalMs;
+    const delay = options.initialDelay ?? 0.12;
+    const curvature = options.curvature ?? 0.12;
+    const mode = options.mode ?? "replace";
+    const characters = Array.from(options.text);
+    if (!Number.isFinite(duration) || duration < 0) throw new RangeError("Typing duration must be finite and non-negative.");
+    if (interval !== undefined && (!Number.isFinite(interval) || interval < 0)) throw new RangeError("characterIntervalMs must be finite and non-negative.");
+    if (!Number.isFinite(delay) || delay < 0) throw new RangeError("initialDelay must be finite and non-negative.");
+    if (!Number.isFinite(curvature) || curvature < 0 || curvature > 1) throw new RangeError("Typing curvature must be between 0 and 1.");
+    if (mode !== "append" && mode !== "replace") throw new TypeError("Text insertion mode must be append or replace.");
+
+    const element = typeof options.target === "string" ? this.resolveTextSelector(options.target) : options.target;
+    if (!(element instanceof HTMLElement) || !this.container.contains(element) || !this.isSupportedTextTarget(element)) {
+      throw new TypeError('Text insertion target must be a contained input, textarea, or [contenteditable="true"] element.');
+    }
+    const dragOwner = this.dragLocks.get(element);
+    if (dragOwner) throw new Error("Target is already being dragged by cursor: " + dragOwner);
+    const textOwner = this.textLocks.get(element);
+    if (textOwner && textOwner !== id) throw new Error("Text target is already being typed into by cursor: " + textOwner);
+
+    this.stopTextInsertion(id);
+    this.stopDrag(id);
+    this.naturalMovement.cancel(id);
+    this.cancelRendererTween(id);
+    this.clickTimelines.get(id)?.kill();
+    this.clickTimelines.delete(id);
+
+    const isInput = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement;
+    const originalValue = isInput ? element.value : undefined;
+    const originalChildren = isInput ? undefined : document.createDocumentFragment();
+    let textNode: Text | undefined;
+    let baseText: string;
+    if (isInput) {
+      baseText = mode === "append" ? originalValue! : "";
+      if (mode === "replace") element.value = "";
+    } else {
+      if (mode === "replace") while (element.firstChild) originalChildren!.appendChild(element.firstChild);
+      textNode = document.createTextNode("");
+      element.appendChild(textNode);
+      baseText = "";
+    }
+
+    const caret = document.createElement("span");
+    caret.className = "cursorbuild-typing-caret";
+    caret.setAttribute("aria-hidden", "true");
+    caret.style.display = "none";
+    caret.style.backgroundColor = this.nodes.get(id)!.color;
+    caret.style.color = this.nodes.get(id)!.color;
+    this.overlay.appendChild(caret);
+    const typingDuration = interval === undefined ? duration : (interval * characters.length) / 1000;
+    const startCursor = this.getPosition(id);
+    if (!startCursor) throw new Error("Cursor has no starting position: " + id);
+    const rect = element.getBoundingClientRect();
+    const containerRect = this.container.getBoundingClientRect();
+    const targetPoint = {
+      x: rect.left - containerRect.left - this.container.clientLeft + this.container.scrollLeft + rect.width / 2,
+      y: rect.top - containerRect.top - this.container.clientTop + this.container.scrollTop + rect.height / 2
+    };
+    const controls = getNaturalControlPoints(startCursor, targetPoint, curvature, id + ":type");
+    const approach = { value: 0 };
+    const progress = { value: 0 };
+    const timeline = gsap.timeline();
+    const record: TextInsertionRecord = {
+      element, timeline, caret, originalValue, originalChildren, textNode,
+      text: options.text, baseText, caretColor: this.nodes.get(id)!.color
+    };
+    this.textLocks.set(element, id);
+    this.activeTextInsertions.set(id, record);
+
+    const updateText = (count: number) => {
+      const value = baseText + characters.slice(0, count).join("");
+      if (isInput) element.value = value;
+      else if (textNode) textNode.data = characters.slice(0, count).join("");
+      this.positionTypingCaret(id, record, value);
+    };
+    if (this.reducedMotion || characters.length === 0 || (typingDuration === 0 && delay === 0)) {
+      element.focus({ preventScroll: true });
+      updateText(characters.length);
+      this.setNaturalPosition(id, this.positionForTypingCaret(record, baseText + characters.join("")));
+      this.finishTextInsertion(id, record);
+      return undefined;
+    }
+
+    const approachDuration = Math.min(0.38, Math.max(0.12, duration * 0.22));
+    timeline.to(approach, {
+      value: 1, duration: approachDuration, ease: "power2.inOut",
+      onUpdate: () => {
+        if (!element.isConnected || !this.container.contains(element)) { this.cancelTextInsertionRecord(id, record); return; }
+        this.setNaturalPosition(id, sampleDragBezier(startCursor, controls[0], controls[1], targetPoint, approach.value));
+      }
+    });
+    const totalTime = delay + typingDuration;
+    timeline.to(progress, {
+      value: 1, duration: totalTime, ease: "none",
+      onStart: () => {
+        if (this.activeTextInsertions.get(id) !== record) return;
+        element.focus();
+        this.click(id, { style: "press", duration: 0.16 });
+        record.clickTimeline = this.clickTimelines.get(id);
+        caret.style.display = "block";
+      },
+      onUpdate: () => {
+        if (this.activeTextInsertions.get(id) !== record || !element.isConnected || !this.container.contains(element)) {
+          this.cancelTextInsertionRecord(id, record); return;
+        }
+        const elapsed = progress.value * totalTime;
+        const typingProgress = typingDuration <= 0 ? (elapsed >= delay ? 1 : 0) : Math.max(0, Math.min(1, (elapsed - delay) / typingDuration));
+        updateText(Math.min(characters.length, Math.floor(typingProgress * characters.length + 1e-8)));
+      }
+    });
+    timeline.eventCallback("onComplete", () => {
+      if (this.activeTextInsertions.get(id) !== record) return;
+      updateText(characters.length);
+      this.setNaturalPosition(id, this.positionForTypingCaret(record, baseText + options.text));
+      this.finishTextInsertion(id, record);
+    });
+    return timeline;
+  }
+
+  stopTextInsertion(id: string): void {
+    const record = this.activeTextInsertions.get(id);
+    if (record) this.cancelTextInsertionRecord(id, record);
+  }
+
+  isTyping(id: string): boolean {
+    const record = this.activeTextInsertions.get(id);
+    if (record && (!record.element.isConnected || !this.container.contains(record.element))) this.cancelTextInsertionRecord(id, record);
+    return this.activeTextInsertions.has(id);
+  }
+
   getPosition(id: string): CursorPoint | undefined { const point = this.positions.get(id); return point ? { ...point } : undefined; }
 
   destroy(): void {
@@ -318,6 +488,7 @@ export class CursorRenderer {
     this.mediaQuery?.removeEventListener?.("change", this.handleMotionChange);
     this.mutationObserver.disconnect();
     [...this.activeDrags.entries()].forEach(([id, record]) => this.cancelDragRecord(id, record));
+    [...this.activeTextInsertions.entries()].forEach(([id, record]) => this.cancelTextInsertionRecord(id, record));
     window.removeEventListener("resize", this.handleResize);
     this.tweens.forEach((tween) => tween.kill());
     this.clickTimelines.forEach((timeline) => timeline.kill());
@@ -334,6 +505,7 @@ export class CursorRenderer {
       this.tweens.forEach((tween) => tween.kill()); this.tweens.clear();
       this.positions.forEach((point, id) => { const node = this.nodes.get(id); if (node) gsap.set(node.element, { x: point.x, y: point.y }); });
       this.clickTimelines.forEach((timeline) => timeline.kill()); this.clickTimelines.clear();
+      [...this.activeTextInsertions.entries()].forEach(([id, record]) => this.completeTextInsertion(id, record));
       [...this.activeDrags.entries()].forEach(([id, record]) => {
         const pointer = this.nodes.get(id)?.element.querySelector<SVGElement>(".cursorbuild-cursor__button");
         record.timeline.kill();
@@ -365,6 +537,99 @@ export class CursorRenderer {
     catch { throw new TypeError("Drag target must be a valid CSS selector."); }
     if (!(element instanceof HTMLElement)) throw new Error("Drag selector did not match an HTMLElement inside the mounted container.");
     return element;
+  }
+  private isSupportedTextTarget(element: HTMLElement): boolean {
+    if (element instanceof HTMLTextAreaElement) return true;
+    if (element instanceof HTMLInputElement) return ["text", "search", "email", "url", "tel", "password"].includes(element.type);
+    return element.getAttribute("contenteditable")?.toLowerCase() === "true";
+  }
+  private resolveTextSelector(selector: string): HTMLElement {
+    let element: Element | null;
+    try { element = this.container.querySelector(selector); }
+    catch { throw new TypeError("Text insertion target must be a valid CSS selector."); }
+    if (!(element instanceof HTMLElement)) throw new Error("Text insertion selector did not match an HTMLElement inside the mounted container.");
+    return element;
+  }
+  private positionForTypingCaret(record: TextInsertionRecord, text: string): CursorPoint {
+    const element = record.element;
+    const rect = element.getBoundingClientRect();
+    const containerRect = this.container.getBoundingClientRect();
+    const originX = containerRect.left + this.container.clientLeft - this.container.scrollLeft;
+    const originY = containerRect.top + this.container.clientTop - this.container.scrollTop;
+    const style = window.getComputedStyle(element);
+    let x = rect.left + rect.width - 2;
+    let y = rect.top + rect.height / 2;
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+      const lines = element instanceof HTMLTextAreaElement ? text.split("\n") : [text];
+      const lastLine = lines[lines.length - 1] ?? "";
+      const measure = document.createElement("span");
+      Object.assign(measure.style, { position: "absolute", visibility: "hidden", whiteSpace: "pre", font: style.font });
+      measure.textContent = lastLine;
+      this.overlay.appendChild(measure);
+      const measuredWidth = measure.getBoundingClientRect().width || lastLine.length * (Number.parseFloat(style.fontSize) || 16) * 0.55;
+      measure.remove();
+      x = rect.left + (Number.parseFloat(style.paddingLeft) || 0) + measuredWidth - element.scrollLeft;
+      y = element instanceof HTMLTextAreaElement
+        ? rect.top + (Number.parseFloat(style.paddingTop) || 0) + (lines.length - 1) * (Number.parseFloat(style.lineHeight) || 18) - element.scrollTop
+        : rect.top + rect.height / 2;
+    } else if (record.textNode) {
+      try {
+        const range = document.createRange();
+        range.setStart(record.textNode, record.textNode.length);
+        range.collapse(true);
+        if (typeof range.getBoundingClientRect === "function") {
+          const caretRect = range.getBoundingClientRect();
+          if (caretRect.width || caretRect.height) { x = caretRect.left; y = caretRect.top + caretRect.height / 2; }
+        }
+      } catch { /* Use the contenteditable target's trailing edge as a fallback. */ }
+    }
+    const fontSize = Number.parseFloat(style.fontSize) || 16;
+    record.caret.style.left = (x - originX) + "px";
+    record.caret.style.top = (y - originY - fontSize / 2) + "px";
+    record.caret.style.height = (Number.parseFloat(style.lineHeight) || fontSize * 1.2) + "px";
+    record.caret.style.backgroundColor = record.caretColor;
+    return { x: x - originX, y: y - originY };
+  }
+  private positionTypingCaret(id: string, record: TextInsertionRecord, text: string): void {
+    this.setNaturalPosition(id, this.positionForTypingCaret(record, text));
+  }
+  private restoreTextTarget(record: TextInsertionRecord): void {
+    if (record.originalValue !== undefined) {
+      (record.element as HTMLInputElement | HTMLTextAreaElement).value = record.originalValue;
+    } else if (record.textNode) {
+      record.textNode.remove();
+      if (record.originalChildren) record.element.appendChild(record.originalChildren);
+    }
+  }
+  private cancelTextInsertionRecord(id: string, record: TextInsertionRecord): void {
+    if (this.activeTextInsertions.get(id) !== record) return;
+    record.timeline.kill();
+    if (record.clickTimeline && this.clickTimelines.get(id) === record.clickTimeline) { record.clickTimeline.kill(); this.clickTimelines.delete(id); }
+    this.restoreTextTarget(record);
+    record.caret.remove();
+    this.textLocks.delete(record.element);
+    this.activeTextInsertions.delete(id);
+  }
+  private finishTextInsertion(id: string, record: TextInsertionRecord): void {
+    if (this.activeTextInsertions.get(id) !== record) return;
+    record.caret.remove();
+    this.textLocks.delete(record.element);
+    this.activeTextInsertions.delete(id);
+  }
+  private completeTextInsertion(id: string, record: TextInsertionRecord): void {
+    if (this.activeTextInsertions.get(id) !== record) return;
+    record.timeline.kill();
+    if (record.originalValue !== undefined) {
+      (record.element as HTMLInputElement | HTMLTextAreaElement).value = record.baseText + record.text;
+    } else if (record.textNode) record.textNode.data = record.text;
+    const point = this.positionForTypingCaret(record, record.baseText + record.text);
+    this.setNaturalPosition(id, point);
+    this.finishTextInsertion(id, record);
+  }
+  private cancelRemovedTextInsertions(): void {
+    [...this.activeTextInsertions.entries()].forEach(([id, record]) => {
+      if (!record.element.isConnected || !this.container.contains(record.element)) this.cancelTextInsertionRecord(id, record);
+    });
   }
   private cancelRemovedDrags(): void {
     [...this.activeDrags.entries()].forEach(([id, record]) => {
@@ -430,6 +695,7 @@ export class CursorRenderer {
   }
   private removeNode(id: string): void {
     this.stopDrag(id);
+    this.stopTextInsertion(id);
     this.naturalMovement.cancel(id);
     this.tweens.get(id)?.kill(); this.tweens.delete(id);
     this.clickTimelines.get(id)?.kill(); this.clickTimelines.delete(id);

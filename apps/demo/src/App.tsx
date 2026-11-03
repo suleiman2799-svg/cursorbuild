@@ -51,6 +51,13 @@ export default function App() {
   const guest = [...cursors].reverse().find((cursor) => cursor.id.startsWith("guest-"));
   if (guest) engine.cursors.remove(guest.id);
  }
+ function replayTextInsertion() {
+  const renderer = rendererRef.current;
+  if (!renderer) return;
+  demoTimelineRef.current?.pause();
+  renderer.typeText("maya", { target: "#typing-heading", text: "Ideas take shape when we build together.", duration: 2.1, initialDelay: 0.2, mode: "replace" });
+  renderer.typeText("noah", { target: "#typing-input", text: "A little progress, every day.", duration: 1.8, initialDelay: 0.35, mode: "replace" });
+ }
  function replayDrags() {
   const stage = stageRef.current, renderer = rendererRef.current;
   if (!stage || !renderer) return;
@@ -68,13 +75,14 @@ export default function App() {
   <section className="panel demo-panel">
    <div className="panel-head"><div><p className="eyebrow">LIVE COLLABORATION SPACE</p><h2>Studio canvas</h2></div><span className="count">{String(cursors.length).padStart(2,"0")} active identities</span></div>
    <div className="construction-stage" ref={stageRef}><div className="stage-grid"/><div className="stage-content">
-    <span className="stage-kicker">CURSORBUILD / CREATIVE STUDIO</span><h3>Ideas take shape<br/>when we build together.</h3>
-    <p>Watch each collaborator's pointer press and release with its own ripple style and timing.</p>
+    <span className="stage-kicker">CURSORBUILD / CREATIVE STUDIO</span><h3 id="typing-heading" contentEditable="true" suppressContentEditableWarning spellCheck={false}>Ideas take shape when we build together.</h3>
+    <p>Watch collaborators focus a heading and type into a live input, character by character.</p>
+    <label className="typing-field"><span>PROJECT NOTE</span><input id="typing-input" type="text" defaultValue="Your idea starts here." /></label>
     <div className="stage-card-row drag-card-row"><div id="drag-card-one" className="stage-card drag-card"><span/><strong>Design system</strong><small>Drag me · Maya</small></div><div id="drag-card-two" className="stage-card drag-card"><span/><strong>Live prototype</strong><small>Drag me · Noah</small></div></div>
    </div></div>
-   <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={!cursors.some((cursor) => cursor.id.startsWith("guest-"))}>− Remove cursor</button> <button onClick={replayDrags}>↻ Replay drag demo</button></div></div>
+   <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={!cursors.some((cursor) => cursor.id.startsWith("guest-"))}>− Remove cursor</button> <button onClick={replayTextInsertion}>⌨ Replay typing demo</button> <button onClick={replayDrags}>↻ Replay drag demo</button></div></div>
    <div className="cursor-legend">{cursors.map((cursor) => <span className="cursor-chip" key={cursor.id}><i style={{background:cursor.color}}/>{cursor.name}</span>)}</div>
   </section>
-  <footer><span>FOUNDATION + NATURAL MOVEMENT + CLICK FEEDBACK · v0.3.0</span><span>Visual pointers never intercept page interaction.</span></footer>
+  <footer><span>FOUNDATION + MOVEMENT + CLICK + DRAG + TEXT · v0.4.0</span><span>Visual pointers never intercept page interaction.</span></footer>
  </main>;
 }
