@@ -34,7 +34,7 @@ import "@cursorbuild/core/cursor-renderer.css";
 
 const engine = new CursorBuildEngine();
 engine.cursors.add({ id: "designer", name: "Maya · Design", color: "#a78bfa" });
-const renderer = engine.mountCursors(document.querySelector("#canvas")!);
+const renderer = engine.mountCursors(document.querySelector<HTMLElement>("#canvas")!);
 renderer.moveTo("designer", { x: 180, y: 120 });
 renderer.click("designer"); // visual pulse only; does not dispatch a DOM click
 // engine.destroy() disposes renderers and GSAP resources.
