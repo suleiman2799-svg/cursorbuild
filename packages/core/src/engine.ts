@@ -3,6 +3,7 @@ import { resolveConfig } from "./config.js";
 import { CursorManager } from "./cursor/cursor-manager.js";
 import { CursorRenderer } from "./cursor/cursor-renderer.js";
 import type { CursorRendererOptions } from "./cursor/cursor-renderer.js";
+import { ScrollConstructionEngine } from "./scroll/scroll-construction-engine.js";
 import { ScrollManager } from "./scroll/scroll-manager.js";
 import type { CursorBuildConfig } from "./types.js";
 export class CursorBuildEngine {
@@ -10,6 +11,7 @@ export class CursorBuildEngine {
  readonly cursors = new CursorManager();
  readonly animations = new AnimationManager();
  readonly scroll = new ScrollManager();
+ readonly construction = new ScrollConstructionEngine();
  private readonly cursorRenderers = new Set<CursorRenderer>();
  private destroyed = false;
  constructor(config: Partial<CursorBuildConfig> = {}) { this.config = resolveConfig(config); }
@@ -27,6 +29,7 @@ export class CursorBuildEngine {
   this.cursorRenderers.forEach((renderer) => renderer.destroy());
   this.cursorRenderers.clear();
   this.animations.killAll();
+  this.construction.destroy();
   this.scroll.killAll();
  }
 }
