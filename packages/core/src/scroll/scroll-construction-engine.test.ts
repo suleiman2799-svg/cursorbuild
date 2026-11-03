@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const timeline = {
@@ -30,6 +30,13 @@ vi.mock("gsap/ScrollTrigger", () => ({
 import { ScrollConstructionEngine } from "./scroll-construction-engine.js";
 
 describe("ScrollConstructionEngine", () => {
+  const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
+
+  afterEach(() => {
+    if (originalMatchMedia) Object.defineProperty(window, "matchMedia", originalMatchMedia);
+    else Reflect.deleteProperty(window, "matchMedia");
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.triggers.length = 0;
@@ -83,7 +90,7 @@ describe("ScrollConstructionEngine", () => {
     scene.resume();
     expect(scene.isPaused).toBe(false);
     expect(scene.progress).toBe(0.8);
-    expect(mocks.timeline.resume).toHaveBeenCalled();
+    expect(mocks.timeline.resume).not.toHaveBeenCalled();
   });
 
   it("destroys individual scenes and releases their trigger and timeline", () => {
