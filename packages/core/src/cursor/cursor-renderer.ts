@@ -594,7 +594,7 @@ export class CursorRenderer {
       return [1, 0, 0, 1] as const;
     })();
     const [ma, mb, mc, md] = transformMatrix;
-    const originParts = computed.transformOrigin.trim().split(/\\s+/).filter(Boolean);
+    const originParts = computed.transformOrigin.trim().split(/\s+/).filter(Boolean);
     const originFraction = (value: string | undefined, dimension: number): number => {
       if (!value) return 0.5;
       const token = value.toLowerCase();
