@@ -116,6 +116,7 @@ export class CursorRenderer {
   private mediaQuery?: MediaQueryList;
   private pointerQuery?: MediaQueryList;
   private readonly visualViewport?: VisualViewport;
+  private visibilityFrame?: number;
   private destroyed = false;
 
   constructor(private readonly manager: CursorManager, private readonly container: HTMLElement, options: CursorRendererOptions = {}) {
@@ -498,6 +499,10 @@ export class CursorRenderer {
     this.mediaQuery?.removeEventListener?.("change", this.handleMotionChange);
     this.pointerQuery?.removeEventListener?.("change", this.handlePointerChange);
     this.mutationObserver.disconnect();
+    if (this.visibilityFrame !== undefined) {
+      window.cancelAnimationFrame?.(this.visibilityFrame);
+      this.visibilityFrame = undefined;
+    }
     [...this.activeDrags.entries()].forEach(([id, record]) => this.cancelDragRecord(id, record));
     [...this.activeTextInsertions.entries()].forEach(([id, record]) => this.cancelTextInsertionRecord(id, record));
     window.removeEventListener("resize", this.handleResize);
@@ -536,8 +541,19 @@ export class CursorRenderer {
       });
     }
   };
-  private readonly handleResize = (): void => this.updateVisibility();
-  private readonly handlePointerChange = (): void => this.updateVisibility();
+  private readonly handleResize = (): void => this.scheduleVisibilityUpdate();
+  private readonly handlePointerChange = (): void => this.scheduleVisibilityUpdate();
+  private scheduleVisibilityUpdate(): void {
+    if (this.destroyed || this.visibilityFrame !== undefined) return;
+    if (typeof window.requestAnimationFrame !== "function") {
+      this.updateVisibility();
+      return;
+    }
+    this.visibilityFrame = window.requestAnimationFrame(() => {
+      this.visibilityFrame = undefined;
+      if (!this.destroyed) this.updateVisibility();
+    });
+  }
   private assertActive(): void { if (this.destroyed) throw new Error("CursorRenderer has been destroyed."); }
   private validateClickOptions(options: Required<CursorClickFeedbackOptions>): void {
     if (!Number.isFinite(options.duration) || options.duration < 0) throw new RangeError("Click duration must be finite and non-negative.");
