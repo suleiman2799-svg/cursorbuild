@@ -98,7 +98,7 @@ export class VisualEffectsManager {
     path.setAttribute("points", points.map(p => p.x + "," + p.y).join(" ")); path.setAttribute("fill", "none");
     path.setAttribute("stroke", options.color ?? "#8b5cf6"); path.setAttribute("stroke-width", String(options.width ?? 3));
     path.setAttribute("stroke-linecap", "round"); path.setAttribute("stroke-linejoin", "round"); path.setAttribute("opacity", String(options.opacity ?? 0.65));
-    svg.appendChild(path); this.overlay.appendChild(svg); return this.registerTransient(svg);
+    svg.appendChild(path); this.overlay.appendChild(svg); this.registerTransient(svg); return svg;
   }
   setProgress(value: number, label = "Construction progress"): void {
     this.assertActive(); if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError("Progress must be between 0 and 1.");
