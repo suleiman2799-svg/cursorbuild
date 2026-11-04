@@ -116,9 +116,12 @@ export class VisualEffectsManager {
     Object.assign(layer.style, { position: "absolute", inset: "0", pointerEvents: "none" });
     const origin = this.origin();
     let outlined = 0;
-    for (const element of Array.from(this.container.querySelectorAll<HTMLElement>("*"))) {
-      if (outlined >= this.maxBlueprintElements) break;
-      if (this.overlay.contains(element)) continue;
+    const walker = document.createTreeWalker(this.container, NodeFilter.SHOW_ELEMENT);
+    let current = walker.nextNode();
+    while (current && outlined < this.maxBlueprintElements) {
+      const element = current as HTMLElement;
+      current = walker.nextNode();
+      if (element === this.overlay || this.overlay.contains(element) || element.classList.contains("cursorbuild-overlay")) continue;
       const rect = element.getBoundingClientRect();
       if (!rect.width && !rect.height) continue;
       outlined += 1;
