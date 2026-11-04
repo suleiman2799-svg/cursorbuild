@@ -10,4 +10,5 @@ export * from "./scroll/scroll-manager.js";
 export * from "./scroll/scroll-construction-engine.js";
 export * from "./sequence/action-sequence.js";
 export * from "./coordination/multi-cursor-coordination-engine.js";
+export * from "./coordination/multi-cursor-coordinator.js";
 export * from "./visual-effects/visual-effects-manager.js";

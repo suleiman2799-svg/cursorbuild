@@ -166,6 +166,38 @@ describe("VisualEffectsManager", () => {
     }
   });
 
+
+  it("updates active progress transitions when the reduced-motion preference changes", () => {
+    let listener: ((event: MediaQueryListEvent) => void) | undefined;
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: (_type: string, callback: (event: MediaQueryListEvent) => void) => {
+        if (query === "(prefers-reduced-motion: reduce)") listener = callback;
+      },
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => true)
+    })) as unknown as typeof window.matchMedia;
+    try {
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      manager = new VisualEffectsManager(container, { performanceMode: "balanced" });
+      manager.setProgress(0.4);
+      const fill = manager.overlay.querySelector(".cursorbuild-effect-progress__fill") as HTMLElement;
+      expect(fill.style.transition).toBe("width 180ms ease");
+      listener?.({ matches: true } as MediaQueryListEvent);
+      expect(fill.style.transition).toBe("none");
+      listener?.({ matches: false } as MediaQueryListEvent);
+      expect(fill.style.transition).toBe("width 180ms ease");
+    } finally {
+      window.matchMedia = originalMatchMedia;
+    }
+  });
+
   it("clear removes every active effect, including transient guides, measurements, and trails", () => {
     setup();
     const highlight = manager!.highlight("#card");

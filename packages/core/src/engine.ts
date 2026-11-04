@@ -4,6 +4,7 @@ import { resolveConfig } from "./config.js";
 import { CursorManager } from "./cursor/cursor-manager.js";
 import { CursorRenderer } from "./cursor/cursor-renderer.js";
 import { MultiCursorCoordinationEngine } from "./coordination/multi-cursor-coordination-engine.js";
+import { MultiCursorCoordinator } from "./coordination/multi-cursor-coordinator.js";
 import { VisualEffectsManager } from "./visual-effects/visual-effects-manager.js";
 import type { CursorRendererOptions } from "./cursor/cursor-renderer.js";
 import type { VisualEffectsOptions } from "./visual-effects/visual-effects-manager.js";
@@ -17,8 +18,10 @@ export class CursorBuildEngine {
   readonly animations = new AnimationManager();
   readonly cinematic: CinematicAnimationEngine;
   readonly scroll = new ScrollManager();
-  readonly construction = new ScrollConstructionEngine();
   readonly coordination = new MultiCursorCoordinationEngine();
+  /** Compatibility coordinator for the original action-array API. */
+  readonly coordinator = new MultiCursorCoordinator();
+  readonly construction = new ScrollConstructionEngine();
   private readonly cursorRenderers = new Set<CursorRenderer>();
   private readonly visualEffects = new Set<VisualEffectsManager>();
   private destroyed = false;
@@ -48,14 +51,18 @@ export class CursorBuildEngine {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
+    // Abort orchestrated work before disposing the timelines and DOM resources
+    // that coordinated callbacks may still be using.
+    this.coordination.destroy();
+    this.coordinator.destroy();
+    this.construction.destroy();
+    this.scroll.destroy();
+    this.cinematic.destroy();
+    this.animations.destroy();
     this.cursorRenderers.forEach((renderer) => renderer.destroy());
     this.cursorRenderers.clear();
     this.visualEffects.forEach((effects) => effects.destroy());
     this.visualEffects.clear();
-    this.animations.killAll();
-    this.cinematic.destroy();
-    this.coordination.destroy();
-    this.construction.destroy();
-    this.scroll.killAll();
+    this.cursors.destroy();
   }
 }
