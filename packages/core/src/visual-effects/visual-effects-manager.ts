@@ -17,6 +17,7 @@ export class VisualEffectsManager {
   private readonly originalPosition: string;
   private readonly changedPosition: boolean;
   private readonly handles = new Set<VisualEffectHandle>();
+  private readonly transientCleanups = new Set<() => void>();
   private progress?: HTMLDivElement;
   private destroyed = false;
 
@@ -57,7 +58,7 @@ export class VisualEffectsManager {
       group.appendChild(line);
       if (guide.label) { const tag = document.createElement("span"); tag.textContent = guide.label; Object.assign(tag.style, { position: "absolute", padding: "2px 5px", color: "#fff", background: guide.color ?? "#ec4899", font: "10px/1.4 sans-serif", ...(guide.axis === "vertical" ? { left: guide.position + "px", top: "4px" } : { left: "4px", top: guide.position + "px" }) }); group.appendChild(tag); }
     }
-    this.overlay.appendChild(group); return () => group.remove();
+    this.overlay.appendChild(group); return this.registerTransient(group);
   }
   showSnapGuide(axis: VisualGuide["axis"], position: number, label = "Snap"): () => void { return this.showGuides([{ axis, position, label, color: "#10b981" }]); }
   showMeasurement(from: VisualPoint, to: VisualPoint, label?: string): HTMLElement {
@@ -66,6 +67,7 @@ export class VisualEffectsManager {
     const line = this.box("cursorbuild-effect-measurement");
     Object.assign(line.style, { left: from.x + "px", top: from.y + "px", width: length + "px", height: "1px", background: "#f59e0b", transformOrigin: "0 50%", transform: "rotate(" + Math.atan2(dy, dx) + "rad)" });
     if (label) { const tag = document.createElement("span"); tag.textContent = label; Object.assign(tag.style, { position: "absolute", left: length / 2 + "px", top: "-18px", transform: "translateX(-50%)", padding: "1px 4px", color: "#111827", background: "#fbbf24", font: "11px/1.4 sans-serif", whiteSpace: "nowrap" }); line.appendChild(tag); }
+    this.registerTransient(line);
     return line;
   }
   showGrid(options: GridOptions = {}): VisualEffectHandle {
@@ -96,7 +98,7 @@ export class VisualEffectsManager {
     path.setAttribute("points", points.map(p => p.x + "," + p.y).join(" ")); path.setAttribute("fill", "none");
     path.setAttribute("stroke", options.color ?? "#8b5cf6"); path.setAttribute("stroke-width", String(options.width ?? 3));
     path.setAttribute("stroke-linecap", "round"); path.setAttribute("stroke-linejoin", "round"); path.setAttribute("opacity", String(options.opacity ?? 0.65));
-    svg.appendChild(path); this.overlay.appendChild(svg); return svg;
+    svg.appendChild(path); this.overlay.appendChild(svg); return this.registerTransient(svg);
   }
   setProgress(value: number, label = "Construction progress"): void {
     this.assertActive(); if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError("Progress must be between 0 and 1.");
@@ -115,8 +117,25 @@ export class VisualEffectsManager {
     this.assertActive(); this.setProgress(1, label);
     if (this.progress) { this.progress.dataset.complete = "true"; const fill = this.progress.firstElementChild as HTMLElement | null; if (fill) fill.style.background = "#10b981"; }
   }
-  clear(): void { if (this.destroyed) return; this.handles.forEach(h => h.destroy()); this.handles.clear(); this.overlay.replaceChildren(); this.progress = undefined; }
+  clear(): void {
+    if (this.destroyed) return;
+    for (const handle of Array.from(this.handles)) handle.destroy();
+    for (const cleanup of Array.from(this.transientCleanups)) cleanup();
+    this.overlay.replaceChildren();
+    this.progress = undefined;
+  }
   destroy(): void { if (this.destroyed) return; this.clear(); this.overlay.remove(); if (this.changedPosition) this.container.style.position = this.originalPosition; this.destroyed = true; }
+  private registerTransient<T extends HTMLElement | SVGSVGElement>(element: T): () => void {
+    let active = true;
+    const cleanup = (): void => {
+      if (!active) return;
+      active = false;
+      element.remove();
+      this.transientCleanups.delete(cleanup);
+    };
+    this.transientCleanups.add(cleanup);
+    return cleanup;
+  }
   private box(className: string): HTMLDivElement { const el = document.createElement("div"); el.className = className; Object.assign(el.style, { position: "absolute", boxSizing: "border-box", pointerEvents: "none" }); this.overlay.appendChild(el); return el; }
   private track(element: HTMLElement, refresh: () => void): VisualEffectHandle {
     let active = true; const handle: VisualEffectHandle = { element, refresh, destroy: () => { if (!active) return; active = false; element.remove(); this.handles.delete(handle); } };
