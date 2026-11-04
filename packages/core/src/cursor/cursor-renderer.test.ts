@@ -368,3 +368,330 @@ describe("CursorRenderer text insertion simulation", () => {
     expect(() => renderer.drag("b", { target: input, to: { x: 10, y: 10 } })).toThrow(/text insertion/);
   });
 });
+
+
+describe("CursorRenderer element resizing simulation", () => {
+  function addResizeTarget(host: HTMLElement, id = "resize-target") {
+    const target = document.createElement("article");
+    target.id = id;
+    target.style.width = "100px";
+    target.style.height = "80px";
+    target.style.transform = "rotate(4deg)";
+    host.append(target);
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      x: 10, y: 20, left: 10, top: 20, right: 110, bottom: 100,
+      width: 100, height: 80, toJSON: () => ({})
+    } as DOMRect);
+    return target;
+  }
+
+  it("resolves CSS selectors and renders a selection frame with eight handles", () => {
+    const { host, renderer } = setup(["a"]);
+    addResizeTarget(host);
+    renderer.resize("a", { target: "#resize-target", to: { width: 200, height: 140 } });
+    expect(renderer.isResizing("a")).toBe(true);
+    expect(host.querySelectorAll(".cursorbuild-resize-handle")).toHaveLength(8);
+    expect(host.querySelector(".cursorbuild-resize-frame")).not.toBeNull();
+  });
+
+  it("accepts a direct HTMLElement target", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    renderer.resize("a", { target, to: { width: 220, height: 150 } });
+    expect(renderer.isResizing("a")).toBe(true);
+  });
+
+  it("supports all eight configured resize handles", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    const handles = ["top-left", "top", "top-right", "right", "bottom-right", "bottom", "bottom-left", "left"] as const;
+    handles.forEach((handle) => {
+      renderer.resize("a", { target, to: { width: 180, height: 120 }, handle });
+      expect(host.querySelector('[data-handle="' + handle + '"]')).not.toBeNull();
+      renderer.stopResize("a");
+    });
+    expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
+  });
+
+  it("animates width and height progressively without overwriting transforms", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    renderer.resize("a", { target, to: { width: 200, height: 160 } });
+    const tween = gsapState.timelines[0].to.mock.calls[1];
+    tween[0].value = 0.5;
+    tween[1].onUpdate();
+    expect(target.style.width).toBe("150px");
+    expect(target.style.height).toBe("120px");
+    expect(target.style.transform).toBe("rotate(4deg)");
+  });
+
+  it("retains final dimensions after the timeline completes", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    renderer.resize("a", { target, to: { width: 240, height: 170 } });
+    const complete = gsapState.timelines[0].eventCallback.mock.calls.find((call: unknown[]) => call[0] === "onComplete")?.[1] as (() => void) | undefined;
+    complete?.();
+    expect(target.style.width).toBe("240px");
+    expect(target.style.height).toBe("170px");
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
+  });
+
+  it("cancels and restores exact original inline dimensions, translate, and temporary handles", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    target.style.translate = "12px 4px";
+    target.style.position = "absolute";
+    target.style.left = "18px";
+    target.style.top = "26px";
+    renderer.resize("a", { target, to: { width: 240, height: 170 }, handle: "top-left" });
+    renderer.stopResize("a");
+    expect(target.style.position).toBe("absolute");
+    expect(target.style.left).toBe("18px");
+    expect(target.style.top).toBe("26px");
+    expect(target.style.width).toBe("100px");
+    expect(target.style.height).toBe("80px");
+    expect(target.style.translate).toBe("12px 4px");
+    expect(target.style.transform).toBe("rotate(4deg)");
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
+    expect(gsapState.timelines[0].kill).toHaveBeenCalled();
+  });
+
+  it("keeps the opposite edge or corner stationary throughout all eight resize directions", () => {
+    const cases = [
+      ["top-left", "bottom-right"],
+      ["top", "bottom"],
+      ["top-right", "bottom-left"],
+      ["right", "left"],
+      ["bottom-right", "top-left"],
+      ["bottom", "top"],
+      ["bottom-left", "top-right"],
+      ["left", "right"]
+    ] as const;
+    const readTranslate = (part: string): number => {
+      const calc = part.match(/^calc\(([-\d.]+)px \+ ([-\d.]+)px\)$/);
+      return calc ? Number(calc[1]) + Number(calc[2]) : Number.parseFloat(part) || 0;
+    };
+
+    cases.forEach(([handle, anchor]) => {
+      const { host, renderer } = setup(["a"]);
+      const target = addResizeTarget(host);
+      target.style.transform = "none";
+      target.style.translate = "12px 4px";
+      const measure = () => {
+        const translated = target.style.translate;
+        const composed = translated.match(/^calc\(([-\d.]+)px \+ ([-\d.]+)px\) calc\(([-\d.]+)px \+ ([-\d.]+)px\)$/);
+        const parts = translated.split(/\s+/);
+        const tx = composed ? Number(composed[1]) + Number(composed[2]) : readTranslate(parts[0] || "0px");
+        const ty = composed ? Number(composed[3]) + Number(composed[4]) : readTranslate(parts[1] || "0px");
+        const left = 10 + tx, top = 20 + ty;
+        const width = Number.parseFloat(target.style.width);
+        const height = Number.parseFloat(target.style.height);
+        return { left, top, right: left + width, bottom: top + height, width, height };
+      };
+      vi.spyOn(target, "getBoundingClientRect").mockImplementation(() => {
+        const box = measure();
+        return {
+          x: box.left, y: box.top, left: box.left, top: box.top,
+          right: box.right, bottom: box.bottom, width: box.width, height: box.height,
+          toJSON: () => ({})
+        } as DOMRect;
+      });
+
+      const initial = measure();
+      renderer.resize("a", { target, to: { width: 140, height: 100 }, handle });
+      const resizeTween = gsapState.timelines[gsapState.timelines.length - 1].to.mock.calls[1];
+      const progress = resizeTween[0] as { value: number };
+      const onUpdate = resizeTween[1].onUpdate as () => void;
+
+      for (const value of [0.25, 0.5, 0.75]) {
+        progress.value = value;
+        onUpdate();
+        const current = measure();
+        if (anchor === "top-left" || anchor === "bottom-left") {
+          expect(current.left).toBeCloseTo(initial.left, 5);
+        }
+        if (anchor === "top-right" || anchor === "bottom-right") {
+          expect(current.right).toBeCloseTo(initial.right, 5);
+        }
+        if (anchor === "top-left" || anchor === "top-right") {
+          expect(current.top).toBeCloseTo(initial.top, 5);
+        }
+        if (anchor === "bottom-left" || anchor === "bottom-right") {
+          expect(current.bottom).toBeCloseTo(initial.bottom, 5);
+        }
+        if (anchor === "top" || anchor === "bottom") {
+          expect(current.left).toBeCloseTo(initial.left, 5);
+          expect(current.right).toBeCloseTo(initial.right, 5);
+          expect(anchor === "bottom" ? current.bottom : current.top)
+            .toBeCloseTo(anchor === "bottom" ? initial.bottom : initial.top, 5);
+        }
+        if (anchor === "left" || anchor === "right") {
+          expect(current.top).toBeCloseTo(initial.top, 5);
+          expect(current.bottom).toBeCloseTo(initial.bottom, 5);
+          expect(anchor === "right" ? current.right : current.left)
+            .toBeCloseTo(anchor === "right" ? initial.right : initial.left, 5);
+        }
+      }
+
+      expect(target.style.transform).toBe("none");
+      renderer.stopResize("a");
+      expect(target.style.translate).toBe("12px 4px");
+      expect(target.style.width).toBe("100px");
+      expect(target.style.height).toBe("80px");
+    });
+  });
+
+  it("keeps the opposite anchor fixed for a rotated target", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    target.style.width = "100px";
+    target.style.height = "80px";
+    target.style.translate = "12px 4px";
+    target.style.transform = "matrix(0, 1, -1, 0, 0, 0)";
+    target.style.transformOrigin = "50% 50%";
+    const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation((element) => {
+      if (element === target) {
+        return {
+          width: "100px", height: "80px", boxSizing: "content-box",
+          paddingLeft: "0px", paddingRight: "0px", borderLeftWidth: "0px", borderRightWidth: "0px",
+          paddingTop: "0px", paddingBottom: "0px", borderTopWidth: "0px", borderBottomWidth: "0px",
+          translate: "12px 4px", transform: "matrix(0, 1, -1, 0, 0, 0)",
+          transformOrigin: "50% 50%"
+        } as CSSStyleDeclaration;
+      }
+      return nativeGetComputedStyle(element);
+    });
+    const rect = () => ({
+      x: 10, y: 20, left: 10, top: 20, right: 110, bottom: 100,
+      width: 100, height: 80, toJSON: () => ({})
+    } as DOMRect);
+    vi.spyOn(target, "getBoundingClientRect").mockImplementation(rect);
+
+    renderer.resize("a", { target, to: { width: 140, height: 100 }, handle: "top-left" });
+    const tween = gsapState.timelines[gsapState.timelines.length - 1].to.mock.calls[1];
+    const progress = tween[0] as { value: number };
+    const onUpdate = tween[1].onUpdate as () => void;
+    progress.value = 1;
+    onUpdate();
+
+    // R90 with a centered transform origin maps the 40x20 anchor delta
+    // to a net screen displacement of (10, 30); the counter-translation
+    // must therefore be (-10, -30), in addition to the original translate.
+    expect(target.style.translate).toBe("calc(12px + -10px) calc(4px + -30px)");
+    renderer.stopResize("a");
+    expect(target.style.translate).toBe("12px 4px");
+    expect(target.style.transform).toBe("matrix(0, 1, -1, 0, 0, 0)");
+  });
+
+  it("rejects invalid dimensions, selectors, durations, and curvature", () => {
+    const { host, renderer } = setup(["a"]);
+    addResizeTarget(host);
+    expect(() => renderer.resize("a", { target: "#resize-target", to: { width: 0, height: 100 } })).toThrow(RangeError);
+    expect(() => renderer.resize("a", { target: "#resize-target", to: { width: 100, height: -1 } })).toThrow(RangeError);
+    expect(() => renderer.resize("a", { target: "#missing", to: { width: 100, height: 100 } })).toThrow(/did not match/);
+    expect(() => renderer.resize("a", { target: "[", to: { width: 100, height: 100 } })).toThrow(/valid CSS selector/);
+    expect(() => renderer.resize("a", { target: "#resize-target", to: { width: 100, height: 100 }, duration: -1 })).toThrow(RangeError);
+    expect(() => renderer.resize("a", { target: "#resize-target", to: { width: 100, height: 100 }, curvature: 2 })).toThrow(RangeError);
+  });
+
+  it("locks a target against another cursor but allows concurrent resizes on separate targets", () => {
+    const { host, renderer } = setup(["a", "b"]);
+    const one = addResizeTarget(host, "one"), two = addResizeTarget(host, "two");
+    renderer.resize("a", { target: one, to: { width: 180, height: 120 } });
+    expect(() => renderer.resize("b", { target: one, to: { width: 190, height: 130 } })).toThrow(/already being resized/);
+    renderer.resize("b", { target: two, to: { width: 190, height: 130 } });
+    expect(renderer.isResizing("a")).toBe(true);
+    expect(renderer.isResizing("b")).toBe(true);
+  });
+
+  it("restores the resize target when the same cursor starts a drag", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    target.style.translate = "12px 4px";
+    renderer.resize("a", { target, to: { width: 180, height: 120 }, handle: "top-left" });
+    renderer.drag("a", { target, to: { x: 40, y: 50 } });
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(renderer.isDragging("a")).toBe(true);
+    expect(target.style.width).toBe("100px");
+    expect(target.style.height).toBe("80px");
+    expect(target.style.translate).toBe("12px 4px");
+  });
+
+  it("restores the resize target when the same cursor starts text insertion", () => {
+    const { host, renderer } = setup(["a"]);
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = "Existing";
+    host.append(input);
+    input.style.width = "100px";
+    input.style.height = "80px";
+    input.style.translate = "12px 4px";
+    renderer.resize("a", { target: input, to: { width: 180, height: 120 }, handle: "top-left" });
+    renderer.typeText("a", { target: input, text: "Updated" });
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(renderer.isTyping("a")).toBe(true);
+    expect(input.style.width).toBe("100px");
+    expect(input.style.height).toBe("80px");
+    expect(input.style.translate).toBe("12px 4px");
+  });
+
+  it("restores the resize target when the same cursor starts a movement sequence", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    renderer.resize("a", { target, to: { width: 180, height: 120 }, handle: "top-left" });
+    renderer.moveSequence("a", [{ to: { x: 120, y: 90 }, duration: 0.2 }]);
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(target.style.width).toBe("100px");
+    expect(target.style.height).toBe("80px");
+    expect(target.style.translate).toBe("");
+  });
+
+  it("cancels and restores dimensions when the target is removed", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    renderer.resize("a", { target, to: { width: 200, height: 150 } });
+    target.remove();
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(target.style.width).toBe("100px");
+    expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
+  });
+
+  it("cancels and restores dimensions when the owning cursor is removed", () => {
+    const { manager, host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    renderer.resize("a", { target, to: { width: 200, height: 150 } });
+    manager.remove("a");
+    expect(target.style.width).toBe("100px");
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
+  });
+
+  it("cancels all active resizes and removes frames when the renderer is destroyed", () => {
+    const { host, renderer } = setup(["a", "b"]);
+    const one = addResizeTarget(host, "one"), two = addResizeTarget(host, "two");
+    renderer.resize("a", { target: one, to: { width: 200, height: 150 } });
+    renderer.resize("b", { target: two, to: { width: 220, height: 160 } });
+    renderer.destroy();
+    expect(one.style.width).toBe("100px");
+    expect(two.style.width).toBe("100px");
+    expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
+    expect(gsapState.timelines[0].kill).toHaveBeenCalled();
+    expect(gsapState.timelines[1].kill).toHaveBeenCalled();
+  });
+
+  it("applies final dimensions immediately when reduced motion is active", () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as typeof window.matchMedia;
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    expect(renderer.resize("a", { target, to: { width: 210, height: 155 } })).toBeUndefined();
+    expect(target.style.width).toBe("210px");
+    expect(target.style.height).toBe("155px");
+    expect(renderer.isResizing("a")).toBe(false);
+    expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
+    window.matchMedia = original;
+  });
+});

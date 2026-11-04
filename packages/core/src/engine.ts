@@ -1,11 +1,14 @@
 import { AnimationManager } from "./animation/animation-manager.js";
+import { CinematicAnimationEngine } from "./animation/cinematic-animation-engine.js";
 import { resolveConfig } from "./config.js";
 import { CursorManager } from "./cursor/cursor-manager.js";
 import { CursorRenderer } from "./cursor/cursor-renderer.js";
 import { MultiCursorCoordinationEngine } from "./coordination/multi-cursor-coordination-engine.js";
+import { MultiCursorCoordinator } from "./coordination/multi-cursor-coordinator.js";
 import { VisualEffectsManager } from "./visual-effects/visual-effects-manager.js";
 import type { CursorRendererOptions } from "./cursor/cursor-renderer.js";
 import type { VisualEffectsOptions } from "./visual-effects/visual-effects-manager.js";
+import { ScrollConstructionEngine } from "./scroll/scroll-construction-engine.js";
 import { ScrollManager } from "./scroll/scroll-manager.js";
 import type { CursorBuildConfig } from "./types.js";
 
@@ -13,13 +16,20 @@ export class CursorBuildEngine {
   readonly config: CursorBuildConfig;
   readonly cursors = new CursorManager();
   readonly animations = new AnimationManager();
+  readonly cinematic: CinematicAnimationEngine;
   readonly scroll = new ScrollManager();
   readonly coordination = new MultiCursorCoordinationEngine();
+  /** Compatibility coordinator for the original action-array API. */
+  readonly coordinator = new MultiCursorCoordinator();
+  readonly construction = new ScrollConstructionEngine();
   private readonly cursorRenderers = new Set<CursorRenderer>();
   private readonly visualEffects = new Set<VisualEffectsManager>();
   private destroyed = false;
 
-  constructor(config: Partial<CursorBuildConfig> = {}) { this.config = resolveConfig(config); }
+  constructor(config: Partial<CursorBuildConfig> = {}) {
+    this.config = resolveConfig(config);
+    this.cinematic = new CinematicAnimationEngine({ respectReducedMotion: this.config.respectReducedMotion });
+  }
 
   /** Attach a visual cursor layer. Coordinates are container-relative CSS pixels. */
   mountCursors(container: HTMLElement, options: CursorRendererOptions = {}): CursorRenderer {
@@ -46,7 +56,10 @@ export class CursorBuildEngine {
     this.visualEffects.forEach((effects) => effects.destroy());
     this.visualEffects.clear();
     this.animations.killAll();
+    this.cinematic.destroy();
     this.coordination.destroy();
+    this.coordinator.destroy();
+    this.construction.destroy();
     this.scroll.killAll();
   }
 }
