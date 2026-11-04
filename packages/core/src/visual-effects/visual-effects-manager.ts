@@ -2,7 +2,18 @@ export type VisualEffectTarget = string | HTMLElement;
 export interface VisualPoint { x: number; y: number; }
 export interface VisualGuide { axis: "vertical" | "horizontal"; position: number; label?: string; color?: string; }
 export interface VisualEffectHandle { readonly element: HTMLElement; refresh(): void; destroy(): void; }
-export interface VisualEffectsOptions { zIndex?: number; gridSize?: number; respectReducedMotion?: boolean; }
+export type VisualEffectsPerformanceMode = "auto" | "quality" | "balanced" | "performance";
+export interface VisualEffectsOptions {
+  zIndex?: number;
+  gridSize?: number;
+  respectReducedMotion?: boolean;
+  /** Auto selects a lighter profile on touch/small/low-capability devices. */
+  performanceMode?: VisualEffectsPerformanceMode;
+  /** Maximum SVG points retained in one cursor trail. */
+  maxTrailPoints?: number;
+  /** Maximum target outlines created by blueprint snapshots. */
+  maxBlueprintElements?: number;
+}
 export interface HighlightOptions { color?: string; opacity?: number; padding?: number; }
 export interface GridOptions { size?: number; color?: string; opacity?: number; }
 export interface TrailOptions { color?: string; width?: number; opacity?: number; }
@@ -13,6 +24,9 @@ export class VisualEffectsManager {
   readonly overlay: HTMLDivElement;
   private readonly zIndex: number;
   private readonly gridSize: number;
+  private readonly performanceMode: Exclude<VisualEffectsPerformanceMode, "auto">;
+  private readonly maxTrailPoints: number;
+  private readonly maxBlueprintElements: number;
   private readonly reducedMotion: boolean;
   private readonly originalPosition: string;
   private readonly changedPosition: boolean;
@@ -23,9 +37,24 @@ export class VisualEffectsManager {
 
   constructor(private readonly container: HTMLElement, options: VisualEffectsOptions = {}) {
     if (typeof window === "undefined" || typeof document === "undefined") throw new Error("VisualEffectsManager requires a browser DOM.");
-    this.zIndex = options.zIndex ?? 40; this.gridSize = options.gridSize ?? 24;
+    this.zIndex = options.zIndex ?? 40;
+    const requestedMode = options.performanceMode ?? "auto";
+    if (!["auto", "quality", "balanced", "performance"].includes(requestedMode)) throw new TypeError("Unknown visual-effects performance mode.");
+    const touchDevice = (typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches)
+      || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
+    const hardware = typeof navigator === "undefined" ? undefined : navigator as Navigator & { deviceMemory?: number };
+    const constrainedHardware = !!hardware && ((hardware.hardwareConcurrency > 0 && hardware.hardwareConcurrency <= 4)
+      || (typeof hardware.deviceMemory === "number" && hardware.deviceMemory <= 4));
+    this.performanceMode = requestedMode === "auto"
+      ? (touchDevice || constrainedHardware || window.innerWidth <= 600 ? "performance" : "balanced")
+      : requestedMode;
+    this.gridSize = options.gridSize ?? (this.performanceMode === "performance" ? 40 : 24);
+    this.maxTrailPoints = options.maxTrailPoints ?? (this.performanceMode === "quality" ? 1024 : this.performanceMode === "performance" ? 64 : 256);
+    this.maxBlueprintElements = options.maxBlueprintElements ?? (this.performanceMode === "quality" ? 1000 : this.performanceMode === "performance" ? 80 : 250);
     if (!Number.isInteger(this.zIndex)) throw new RangeError("zIndex must be an integer.");
     if (!Number.isFinite(this.gridSize) || this.gridSize <= 0) throw new RangeError("gridSize must be finite and greater than zero.");
+    if (!Number.isInteger(this.maxTrailPoints) || this.maxTrailPoints < 2) throw new RangeError("maxTrailPoints must be an integer of at least 2.");
+    if (!Number.isInteger(this.maxBlueprintElements) || this.maxBlueprintElements < 1) throw new RangeError("maxBlueprintElements must be a positive integer.");
     this.originalPosition = container.style.position;
     const position = window.getComputedStyle(container).position;
     this.changedPosition = !position || position === "static";
@@ -81,8 +110,12 @@ export class VisualEffectsManager {
   setBlueprintMode(enabled: boolean): VisualEffectHandle | undefined {
     this.assertActive(); if (!enabled) return undefined;
     const layer = this.box("cursorbuild-effect-blueprint"), origin = this.origin();
-    for (const element of Array.from(this.container.querySelectorAll<HTMLElement>("*"))) {
-      if (this.overlay.contains(element)) continue; const rect = element.getBoundingClientRect(); if (!rect.width && !rect.height) continue;
+    let outlined = 0;
+    for (const element of this.container.querySelectorAll<HTMLElement>("*")) {
+      if (outlined >= this.maxBlueprintElements) break;
+      if (this.overlay.contains(element)) continue;
+      const rect = element.getBoundingClientRect(); if (!rect.width && !rect.height) continue;
+      outlined += 1;
       const outline = document.createElement("div");
       Object.assign(outline.style, { position: "absolute", left: rect.left - origin.x + "px", top: rect.top - origin.y + "px", width: rect.width + "px", height: rect.height + "px", border: "1px solid rgba(56,189,248,.55)", boxSizing: "border-box" });
       layer.appendChild(outline);
@@ -95,7 +128,10 @@ export class VisualEffectsManager {
     svg.setAttribute("width", String(this.container.clientWidth)); svg.setAttribute("height", String(this.container.clientHeight));
     Object.assign(svg.style, { position: "absolute", inset: "0", overflow: "visible", pointerEvents: "none" });
     const path = document.createElementNS(SVG_NS, "polyline");
-    path.setAttribute("points", points.map(p => p.x + "," + p.y).join(" ")); path.setAttribute("fill", "none");
+    const trailPoints = points.length > this.maxTrailPoints
+      ? Array.from({ length: this.maxTrailPoints }, (_, index) => points[Math.round(index * (points.length - 1) / (this.maxTrailPoints - 1))]!)
+      : points;
+    path.setAttribute("points", trailPoints.map(p => p.x + "," + p.y).join(" ")); path.setAttribute("fill", "none");
     path.setAttribute("stroke", options.color ?? "#8b5cf6"); path.setAttribute("stroke-width", String(options.width ?? 3));
     path.setAttribute("stroke-linecap", "round"); path.setAttribute("stroke-linejoin", "round"); path.setAttribute("opacity", String(options.opacity ?? 0.65));
     svg.appendChild(path); this.overlay.appendChild(svg); this.registerTransient(svg); return svg;
@@ -107,7 +143,7 @@ export class VisualEffectsManager {
       bar.setAttribute("aria-valuemin", "0"); bar.setAttribute("aria-valuemax", "100");
       Object.assign(bar.style, { position: "absolute", left: "0", top: "0", width: "100%", height: "4px", background: "rgba(100,116,139,.2)" });
       const fill = document.createElement("div"); fill.className = "cursorbuild-effect-progress__fill";
-      Object.assign(fill.style, { height: "100%", width: "0%", background: "#8b5cf6", transition: this.reducedMotion ? "none" : "width 180ms ease" });
+      Object.assign(fill.style, { height: "100%", width: "0%", background: "#8b5cf6", transition: this.reducedMotion || this.performanceMode === "performance" ? "none" : "width 180ms ease" });
       bar.appendChild(fill); this.overlay.appendChild(bar); this.progress = bar;
     }
     this.progress.setAttribute("aria-label", label); this.progress.setAttribute("aria-valuenow", String(Math.round(value * 100)));
