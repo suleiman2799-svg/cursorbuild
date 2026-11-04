@@ -65,7 +65,7 @@ describe("CursorBuildEngine feature integration", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
     window.dispatchEvent(new Event("orientationchange"));
     await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-    expect(Array.from(host.querySelectorAll<HTMLElement>(".cursorbuild-cursor")).filter((node) => node.style.display === "flex")).toHaveLength(4);
+    expect([...host.querySelectorAll<HTMLElement>(".cursorbuild-cursor")].filter((node) => node.style.display === "flex")).toHaveLength(4);
     Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     engine.destroy();
   });
