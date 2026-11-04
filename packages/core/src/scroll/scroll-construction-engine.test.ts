@@ -165,6 +165,18 @@ describe("ScrollConstructionEngine", () => {
     scene.destroy();
   });
 
+  it("unregisters a scene when its public destroy method is called directly", () => {
+    const engine = new ScrollConstructionEngine();
+    const scene = engine.createScene("direct-destroy", { trigger: "#direct-destroy" }, () => {});
+
+    scene.destroy();
+
+    expect(engine.getScene("direct-destroy")).toBeUndefined();
+    expect(mocks.triggers[0]!.kill).toHaveBeenCalledOnce();
+    expect(mocks.timelines[0]!.kill).toHaveBeenCalledOnce();
+    expect(() => engine.createScene("direct-destroy", { trigger: "#replacement" }, () => {})).not.toThrow();
+  });
+
   it("rejects invalid and duplicate scene identifiers and cleans up a failed builder", () => {
     const engine = new ScrollConstructionEngine();
     expect(() => engine.createScene(" ", { trigger: "#hero" }, () => {})).toThrow(/id is required/);
