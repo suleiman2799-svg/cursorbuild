@@ -17,7 +17,7 @@ The overlay and all cursor descendants use pointer-events: none. Cursor clicks a
 
 ## Responsive and motion behaviour
 
-Default visible cursor limits are 8 on desktop, 3 on tablet (up to 900px), and 2 on mobile (up to 600px). These limits can be overridden per renderer. The renderer follows prefers-reduced-motion when enabled: movement becomes immediate and click feedback is suppressed.
+Default visible cursor limits are 8 on desktop, 3 on tablet (up to 900px), and 2 on mobile (up to 600px). These limits can be overridden per renderer. A separate `touchMaxVisible` cap (default 2) applies when a coarse pointer or touch input is detected. The renderer recalculates visibility on window resize, orientation changes, visual viewport resize, and pointer-media-query changes. All listeners and media-query subscriptions are removed on destroy. The renderer follows prefers-reduced-motion when enabled: movement becomes immediate and click feedback is suppressed. Resize/orientation/visual-viewport and coarse-pointer updates are coalesced into one requestAnimationFrame visibility pass, and a pending frame is cancelled on destroy.
 
 ## Natural cursor movement
 
@@ -38,7 +38,7 @@ The press animation scales the existing SVG pointer down and back to its resting
 
 ## Extension approach
 
-Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport, real collaboration networking, drag/drop, resizing, text insertion, and construction-scene authoring are future modules, not part of the current renderer.
+Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport and real collaboration networking remain future modules. Drag/drop, resizing, text insertion, cinematic animation, scroll-driven construction, and visual effects are implemented as separate modules/adapters, not responsibilities of the cursor renderer.
 
 ## Drag-and-drop simulation
 
@@ -83,4 +83,4 @@ VisualEffectsManager is an optional DOM adapter exposed by engine.mountVisualEff
 - setProgress() and complete() update a visual progress bar.
 - clear() removes active effects while preserving the manager; destroy() removes the overlay and restores the container's original inline position.
 
-All effects are opt-in. Target geometry and blueprint bounds are snapshots; call handle.refresh() after layout changes or recreate blueprint mode. Effects are decorative: guide visuals do not implement snapping, selection does not change application state, and no synthetic pointer or keyboard events are emitted. Reduced-motion preference removes the progress-width transition. CursorBuildEngine tracks effect managers and disposes them on destroy().
+All effects are opt-in. Target geometry and blueprint bounds are snapshots; call handle.refresh() after layout changes or recreate blueprint mode. Effects are decorative: guide visuals do not implement snapping, selection does not change application state, and no synthetic pointer or keyboard events are emitted. Reduced-motion preference removes the progress-width transition. The `performanceMode` option supports `auto`, `quality`, `balanced`, and `performance`. Auto selects the lighter profile for coarse/touch pointers, narrow viewports, or devices reporting four or fewer CPU cores / 4 GB memory, and re-evaluates it on viewport resize or coarse-pointer media-query changes. The recalculation is coalesced to one animation-frame update; explicitly selected profiles remain fixed. Profiles adjust the default grid spacing, trail point cap, blueprint outline cap, and progress transition. Blueprint snapshots collect geometry before appending the completed outline layer, avoiding interleaved layout reads and DOM writes. `maxTrailPoints` and `maxBlueprintElements` allow explicit per-instance limits; trails are evenly downsampled while preserving endpoints, and blueprint snapshots stop after the configured number of visible element bounds. CursorBuildEngine tracks effect managers and disposes them on destroy().

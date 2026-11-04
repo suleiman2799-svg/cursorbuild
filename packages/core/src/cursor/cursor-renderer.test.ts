@@ -104,19 +104,93 @@ describe("CursorRenderer", () => {
   });
 });
 describe("CursorRenderer responsive behaviour", () => {
-  it("limits visible cursor nodes on mobile and restores them on desktop resize", () => {
+  it("limits visible cursor nodes on mobile and restores them on desktop resize", async () => {
     const { manager, host, renderer } = setup([]);
     for (let index = 0; index < 4; index++) manager.add({ id: String(index), name: "Designer " + index, color: "#abc" });
     const originalWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
     window.dispatchEvent(new Event("resize"));
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
     const nodes = Array.from(host.querySelectorAll<HTMLElement>(".cursorbuild-cursor"));
     expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(2);
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
     window.dispatchEvent(new Event("resize"));
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
     expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(4);
     Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     renderer.destroy();
+  });
+
+  it("applies a separate visible-cursor cap for coarse pointers and reacts to pointer changes", async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
+    let pointerChanged: ((event: MediaQueryListEvent) => void) | undefined;
+    const pointerMedia = {
+      matches: true,
+      addEventListener: vi.fn((_type: string, listener: (event: MediaQueryListEvent) => void) => { pointerChanged = listener; }),
+      removeEventListener: vi.fn()
+    };
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn((query: string) => query === "(pointer: coarse)"
+      ? pointerMedia
+      : { matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as typeof window.matchMedia;
+
+    const { manager, host, renderer } = setup([]);
+    for (let index = 0; index < 4; index++) manager.add({ id: String(index), name: "Touch " + index, color: "#abc" });
+    const nodes = Array.from(host.querySelectorAll<HTMLElement>(".cursorbuild-cursor"));
+    expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(2);
+
+    pointerMedia.matches = false;
+    pointerChanged?.({ matches: false } as MediaQueryListEvent);
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(4);
+    renderer.destroy();
+    expect(pointerMedia.removeEventListener).toHaveBeenCalledWith("change", expect.any(Function));
+
+    window.matchMedia = originalMatchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+  });
+
+  it("coalesces resize events into one animation-frame visibility update and cancels pending work on destroy", () => {
+    const originalRequest = window.requestAnimationFrame;
+    const originalCancel = window.cancelAnimationFrame;
+    let frameCallback: FrameRequestCallback | undefined;
+    window.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      frameCallback = callback;
+      return 99;
+    });
+    window.cancelAnimationFrame = vi.fn();
+
+    const { renderer } = setup(["a", "b", "c"]);
+    window.dispatchEvent(new Event("resize"));
+    window.dispatchEvent(new Event("resize"));
+    expect(window.requestAnimationFrame).toHaveBeenCalledOnce();
+
+    frameCallback?.(0);
+    window.dispatchEvent(new Event("orientationchange"));
+    expect(window.requestAnimationFrame).toHaveBeenCalledTimes(2);
+    renderer.destroy();
+    expect(window.cancelAnimationFrame).toHaveBeenCalledWith(99);
+
+    window.requestAnimationFrame = originalRequest;
+    window.cancelAnimationFrame = originalCancel;
+  });
+
+  it("recalculates visibility after orientation changes and validates touch limits", async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
+    const { manager, host, renderer } = setup([]);
+    for (let index = 0; index < 4; index++) manager.add({ id: String(index), name: "Designer " + index, color: "#abc" });
+    const nodes = Array.from(host.querySelectorAll<HTMLElement>(".cursorbuild-cursor"));
+    expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(4);
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 500 });
+    window.dispatchEvent(new Event("orientationchange"));
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(2);
+    renderer.destroy();
+    expect(() => setup(["invalid"], { touchMaxVisible: -1 })).toThrow(RangeError);
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
   });
 });
 

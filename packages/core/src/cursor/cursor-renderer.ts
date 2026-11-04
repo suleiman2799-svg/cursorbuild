@@ -57,6 +57,8 @@ export interface CursorRendererOptions {
   maxVisible?: number;
   tabletMaxVisible?: number;
   mobileMaxVisible?: number;
+  /** Maximum visible cursors when a coarse/touch pointer is available. */
+  touchMaxVisible?: number;
   respectReducedMotion?: boolean;
   initialPositions?: Record<string, CursorPoint>;
   naturalMovement?: NaturalMovementOptions;
@@ -137,6 +139,9 @@ export class CursorRenderer {
   private readonly changedContainerPosition: boolean;
   private reducedMotion: boolean;
   private mediaQuery?: MediaQueryList;
+  private pointerQuery?: MediaQueryList;
+  private readonly visualViewport?: VisualViewport;
+  private visibilityFrame?: number;
   private destroyed = false;
 
   constructor(private readonly manager: CursorManager, private readonly container: HTMLElement, options: CursorRendererOptions = {}) {
@@ -144,16 +149,19 @@ export class CursorRenderer {
     this.options = {
       duration: options.duration ?? 0.72, ease: options.ease ?? "power3.out", zIndex: options.zIndex ?? 50,
       maxVisible: options.maxVisible ?? 8, tabletMaxVisible: options.tabletMaxVisible ?? 3,
-      mobileMaxVisible: options.mobileMaxVisible ?? 2, respectReducedMotion: options.respectReducedMotion ?? true
+      mobileMaxVisible: options.mobileMaxVisible ?? 2, touchMaxVisible: options.touchMaxVisible ?? 2,
+      respectReducedMotion: options.respectReducedMotion ?? true
     };
     if (!Number.isFinite(this.options.duration) || this.options.duration < 0) throw new RangeError("duration must be finite and non-negative.");
-    for (const limit of [this.options.maxVisible, this.options.tabletMaxVisible, this.options.mobileMaxVisible]) {
+    for (const limit of [this.options.maxVisible, this.options.tabletMaxVisible, this.options.mobileMaxVisible, this.options.touchMaxVisible]) {
       if (!Number.isInteger(limit) || limit < 0) throw new RangeError("Visible cursor limits must be non-negative integers.");
     }
     this.clickOptions = { ...CLICK_DEFAULTS, ...options.clickFeedback };
     this.validateClickOptions(this.clickOptions);
     this.initialPositions = options.initialPositions ?? {};
     this.mediaQuery = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : undefined;
+    this.pointerQuery = typeof window.matchMedia === "function" ? window.matchMedia("(pointer: coarse)") : undefined;
+    this.visualViewport = window.visualViewport ?? undefined;
     this.reducedMotion = this.options.respectReducedMotion && !!this.mediaQuery?.matches;
 
     this.originalPosition = container.style.position;
@@ -179,7 +187,10 @@ export class CursorRenderer {
     this.mutationObserver = new MutationObserver(() => { this.cancelRemovedDrags(); this.cancelRemovedTextInsertions(); this.cancelRemovedResizes(); });
     this.mutationObserver.observe(container, { childList: true, subtree: true });
     this.mediaQuery?.addEventListener?.("change", this.handleMotionChange);
+    this.pointerQuery?.addEventListener?.("change", this.handlePointerChange);
     window.addEventListener("resize", this.handleResize, { passive: true });
+    window.addEventListener("orientationchange", this.handleResize, { passive: true });
+    this.visualViewport?.addEventListener("resize", this.handleResize, { passive: true });
     this.sync();
   }
 
@@ -760,11 +771,18 @@ export class CursorRenderer {
     if (this.destroyed) return;
     this.destroyed = true; this.unsubscribe(); this.naturalMovement.destroy();
     this.mediaQuery?.removeEventListener?.("change", this.handleMotionChange);
+    this.pointerQuery?.removeEventListener?.("change", this.handlePointerChange);
     this.mutationObserver.disconnect();
+    if (this.visibilityFrame !== undefined) {
+      window.cancelAnimationFrame?.(this.visibilityFrame);
+      this.visibilityFrame = undefined;
+    }
     [...this.activeDrags.entries()].forEach(([id, record]) => this.cancelDragRecord(id, record));
     [...this.activeTextInsertions.entries()].forEach(([id, record]) => this.cancelTextInsertionRecord(id, record));
     [...this.activeResizes.entries()].forEach(([id, record]) => this.cancelResizeRecord(id, record));
     window.removeEventListener("resize", this.handleResize);
+    window.removeEventListener("orientationchange", this.handleResize);
+    this.visualViewport?.removeEventListener("resize", this.handleResize);
     this.tweens.forEach((tween) => tween.kill());
     this.clickTimelines.forEach((timeline) => timeline.kill());
     this.nodes.forEach(({ element }) => gsap.killTweensOf(element));
@@ -799,7 +817,19 @@ export class CursorRenderer {
       });
     }
   };
-  private readonly handleResize = (): void => this.updateVisibility();
+  private readonly handleResize = (): void => this.scheduleVisibilityUpdate();
+  private readonly handlePointerChange = (): void => this.scheduleVisibilityUpdate();
+  private scheduleVisibilityUpdate(): void {
+    if (this.destroyed || this.visibilityFrame !== undefined) return;
+    if (typeof window.requestAnimationFrame !== "function") {
+      this.updateVisibility();
+      return;
+    }
+    this.visibilityFrame = window.requestAnimationFrame(() => {
+      this.visibilityFrame = undefined;
+      if (!this.destroyed) this.updateVisibility();
+    });
+  }
   private assertActive(): void { if (this.destroyed) throw new Error("CursorRenderer has been destroyed."); }
   private validateClickOptions(options: Required<CursorClickFeedbackOptions>): void {
     if (!Number.isFinite(options.duration) || options.duration < 0) throw new RangeError("Click duration must be finite and non-negative.");
@@ -982,7 +1012,9 @@ export class CursorRenderer {
   }
   private updateVisibility(): void {
     const width = window.innerWidth;
-    const limit = width <= 600 ? this.options.mobileMaxVisible : width <= 900 ? this.options.tabletMaxVisible : this.options.maxVisible;
+    const responsiveLimit = width <= 600 ? this.options.mobileMaxVisible : width <= 900 ? this.options.tabletMaxVisible : this.options.maxVisible;
+    const touchDevice = !!this.pointerQuery?.matches || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
+    const limit = touchDevice ? Math.min(responsiveLimit, this.options.touchMaxVisible) : responsiveLimit;
     const entries = [...this.nodes.entries()];
     const visibleIds = new Set(entries.slice(Math.max(0, entries.length - limit)).map(([id]) => id));
     entries.forEach(([id, cursor]) => { const display = visibleIds.has(id) ? "flex" : "none"; if (cursor.element.style.display !== display) cursor.element.style.display = display; });

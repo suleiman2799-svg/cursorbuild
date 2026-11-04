@@ -2,15 +2,18 @@
 
 **CursorBuild** is an open-source, modular TypeScript toolkit for building visual website-construction scenes with multiple collaborator cursors. Its framework-independent core provides cursor rendering and animation, interaction simulations, multi-cursor orchestration, and optional visual-effect overlays.
 
-> **Project status: active development.** The foundation, cursor rendering and motion, drag/drop simulation, text insertion simulation, Step 8 multi-cursor coordination, and Step 9 advanced visual effects are implemented on the current development branch. Responsive/performance optimisation, resizing, reusable presets, broader examples, and release readiness remain future work. The npm packages are workspace packages in this repository; this README does not imply that they have been published to npm.
+> **Project status: active development.** The foundation, cursor rendering and motion, drag/drop and text insertion simulations, element resizing, cinematic animation, scroll-driven construction, Step 8 multi-cursor coordination, Step 9 advanced visual effects, and Step 10 responsive/performance improvements are implemented. Reusable presets, expanded examples, physical-device profiling, and release readiness remain future work. The npm packages are workspace packages in this repository; this README does not imply that they have been published to npm.
 
 ## Implemented functionality
 
-- **Cursor rendering:** multiple named, coloured DOM cursors with container-relative coordinates, responsive visibility limits, and reduced-motion support.
+- **Cursor rendering:** multiple named, coloured DOM cursors with container-relative coordinates, desktop/tablet/mobile visibility limits, an additional coarse-pointer cap, viewport/orientation updates, and reduced-motion support.
 - **Movement and click feedback:** direct movement, curved natural paths and sequences, plus configurable press and ripple feedback.
-- **Interaction simulations:** visual drag/drop with per-element locking, and progressive text insertion into supported inputs, textareas, and contenteditable targets.
+- **Interaction simulations:** visual drag/drop with per-element locking, progressive text insertion into supported inputs, textareas, and contenteditable targets, and animated element resizing with eight handles and fixed opposite anchors.
+- **Cinematic animations:** independent text/image/mask reveals, section entrances, parallax, transitions, assembly, staggered sequences, configurable timing, and reduced-motion handling.
+- **Scroll-driven construction:** section-based scenes with scroll progress, sequencing, pause/resume, reverse playback, refresh, and scene cleanup.
 - **Step 8 — Multi-cursor coordination:** independent cursor timelines, sequential or parallel actions, cross-cursor dependencies, group/timeline/action delays, individual and group cancellation, abort signals, and engine lifecycle cleanup.
-- **Step 9 — Advanced visual effects:** optional highlights, selection boxes, alignment and snap guides, measurement lines, grid overlays, blueprint snapshots, SVG cursor trails, and construction progress/completion feedback.
+- **Step 9 — Advanced visual effects:** optional highlights, selection boxes, alignment and snap guides, measurement lines, grid overlays, blueprint snapshots, SVG cursor trails, and construction progress/completion feedback. Effects support adaptive quality/performance profiles with configurable trail and blueprint limits.
+- **Step 10 — Responsive/performance:** desktop, tablet, mobile and coarse-pointer visibility caps; viewport/orientation updates; adaptive visual-effect quality; bounded trail/blueprint workloads; and listener/frame cleanup.
 - **Framework integration:** optional React provider and hooks; React is not a dependency of the core runtime.
 
 These features are visual simulations. CursorBuild does not dispatch synthetic mouse, pointer, keyboard, beforeinput, or input events. Dragging does not implement native browser drag-and-drop, guide indicators do not perform snapping, and visual selection does not mutate application state.
@@ -248,6 +251,50 @@ Highlights and selection boxes return handles with `refresh()` and `destroy()`. 
 
 Effects are decorative and opt-in. They do not implement snapping, change application selection/state, intercept pointer input, or dispatch DOM events. Reduced-motion preference disables the progress-width transition by default.
 
+## Step 10 — Responsive and performance optimisation
+
+Cursor visibility is capped by viewport width and coarse-pointer input. The default limits remain 8 desktop, 3 tablet, and 2 mobile cursors; `touchMaxVisible` defaults to 2 and applies as an additional cap on touch/coarse-pointer devices:
+
+~~~ts
+const renderer = engine.mountCursors(canvas, {
+  maxVisible: 8,
+  tabletMaxVisible: 3,
+  mobileMaxVisible: 2,
+  touchMaxVisible: 2,
+  respectReducedMotion: true
+});
+~~~
+
+Visibility is recalculated on window resize, orientation changes, visual viewport resize, and coarse-pointer media-query changes. These listeners are removed when the renderer is destroyed.
+
+Visual effects accept a performance profile:
+
+~~~ts
+const effects = engine.mountVisualEffects(canvas, {
+  performanceMode: "auto", // "auto" | "quality" | "balanced" | "performance"
+  maxTrailPoints: 64,
+  maxBlueprintElements: 80
+});
+~~~
+
+In `auto` mode, touch/coarse-pointer devices, small viewports, or devices reporting four or fewer CPU cores / 4 GB memory use the lighter `performance` profile; other devices use `balanced`. The auto profile is re-evaluated on viewport resize and coarse-pointer media-query changes, with recalculation coalesced to one animation-frame update; explicitly selected profiles remain fixed. The performance profile uses a coarser default grid, caps trails at 64 points and blueprint snapshots at 80 elements, and disables the progress-width transition. Balanced defaults are 256 trail points and 250 blueprint elements; quality defaults are 1024 and 1000. Explicit limits override profile defaults. Reduced-motion settings continue to take precedence over decorative transitions.
+
+These are adaptive safeguards, not a substitute for profiling every browser/device combination. See the roadmap for remaining manual device profiling and browser-level visual regression work.
+
+### Manual device verification
+
+Before release, verify the following in real browsers (including at least one physical touch device):
+
+- **Desktop + mouse:** use a wide viewport and confirm the configured desktop cursor cap.
+- **Tablet + touch:** use a coarse-pointer device or browser device emulation and confirm `touchMaxVisible` applies independently of viewport width.
+- **Phone + orientation:** test a narrow portrait viewport, rotate to landscape, and confirm visibility updates after the orientation change.
+- **Viewport changes:** resize the browser and, where available, test the visual viewport while browser chrome or the on-screen keyboard changes the visible area.
+- **Reduced motion:** enable the operating-system reduced-motion preference and confirm cursor movement/click effects and progress transitions follow the configured policy.
+- **Performance profile:** render long trails and a page with many elements using `performanceMode: "performance"`; confirm the SVG trail and blueprint outline counts remain within configured limits.
+- **Lifecycle:** repeatedly mount and destroy renderers/effect managers; confirm overlays disappear and no stale cursor nodes or resize/pointer listeners remain.
+
+Automated tests cover the responsive caps, orientation event, frame coalescing, effect limits, and cleanup hooks. Physical-device profiling and browser-level visual regression have not yet been performed.
+
 ## Optional React integration
 
 The React workspace exports `CursorBuildProvider`, `useCursorBuild()`, and `useCursors()`:
@@ -295,9 +342,12 @@ GitHub Actions runs tests, type checks, and builds for pushes to development bra
 | Cursor rendering, natural movement, click feedback, responsive visibility and reduced-motion handling | Implemented |
 | Drag/drop and text insertion simulations | Implemented |
 | Step 8 — multi-cursor coordination engine | Implemented |
+| Step 6 — cinematic animation engine | Implemented |
+| Step 7 — scroll-driven construction engine | Implemented |
 | Step 9 — advanced visual effects | Implemented |
+| Step 10 — responsive and performance optimisation | Implemented on this branch |
 | Element resizing and positioning | Planned |
-| Step 10 — responsive and performance optimisation | Planned |
+
 | Step 11 — reusable component and preset library | Planned |
 | Step 12 — complete documentation and developer experience | Planned |
 | Step 13 — demo website and playground | Planned |
