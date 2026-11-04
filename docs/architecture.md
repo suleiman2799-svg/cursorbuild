@@ -9,15 +9,15 @@ CursorBuild is an npm-workspaces monorepo with a framework-independent runtime c
 
 ## Cursor rendering boundary
 
-Cursor identities are registered with CursorManager. CursorRenderer subscribes to that registry and owns a non-interactive DOM overlay mounted inside a caller-supplied HTMLElement. The overlay establishes a container-relative coordinate space; moveTo(x, y) values are CSS pixels from its top-left corner.
+Cursor identities are registered with CursorManager. CursorRenderer subscribes to that registry and owns a non-interactive DOM overlay mounted inside a caller-supplied HTMLElement. The overlay establishes a container-relative coordinate space; movement and interaction coordinates are CSS pixels relative to that container.
 
-The renderer owns cursor DOM nodes, GSAP movement tweens, per-cursor natural-movement timelines, per-cursor click-feedback timelines, its reduced-motion media-query subscription, and resize listener. destroy() removes those resources and restores the container's original inline positioning when the renderer added relative positioning. CursorBuildEngine.mountCursors() tracks renderers so engine.destroy() disposes them too.
+The renderer owns cursor DOM nodes, GSAP movement tweens, per-cursor natural-movement, click-feedback, drag, text-insertion, and resize timelines, target locks, its reduced-motion media-query subscription, and viewport listeners. destroy() removes those resources and restores the container's original inline positioning when the renderer added relative positioning. CursorBuildEngine.mountCursors() tracks renderers so engine.destroy() disposes them too.
 
 The overlay and all cursor descendants use pointer-events: none. Cursor clicks are visual feedback only and never dispatch synthetic clicks to page elements. The ripple reuses the cursor's existing halo element; no transient DOM nodes are allocated for each click.
 
 ## Responsive and motion behaviour
 
-Default visible cursor limits are 8 on desktop, 3 on tablet (up to 900px), and 2 on mobile (up to 600px). These limits can be overridden per renderer. The renderer follows prefers-reduced-motion when enabled: movement becomes immediate and click feedback is suppressed.
+Default visible cursor limits are 8 on desktop, 3 on tablet (up to 900px), and 2 on mobile (up to 600px). These limits can be overridden per renderer. The renderer follows prefers-reduced-motion when enabled: movement becomes immediate, click feedback is suppressed, and active drag/resize/text operations are completed or cleaned up. The renderer updates visibility on viewport resize and removes its listeners on destroy.
 
 ## Natural cursor movement
 
@@ -38,7 +38,7 @@ The press animation scales the existing SVG pointer down and back to its resting
 
 ## Extension approach
 
-Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport, real collaboration networking, drag/drop, resizing, text insertion, and construction-scene authoring are future modules, not part of the current renderer.
+Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport and real collaboration networking remain outside the current library. Drag/drop, text insertion, resizing, and construction-scene authoring are implemented as optional visual-simulation modules with explicit lifecycle ownership.
 
 ## Drag-and-drop simulation
 
@@ -49,6 +49,13 @@ The element is moved with the CSS individual `translate` property. Its `transfor
 Each cursor owns one drag timeline, and a renderer-level element lock prevents two cursors from acquiring the same target. Separate cursors may drag separate elements concurrently. Drag start cancels that cursor's in-flight direct/natural movement and click feedback to avoid competing transforms. Removed targets are detected by a container MutationObserver and checked during progress; cursor removal and renderer destruction also cancel and restore active drags. The observer is disconnected on destroy.
 
 Coordinates are CSS pixels relative to the mounted container's content origin, accounting for its border and scroll offset. With reduced motion enabled, a drag completes immediately at its destination. The simulation never dispatches synthetic mouse, pointer, or drag events and does not emulate native browser drag-and-drop data transfer.
+
+## Element resizing simulation
+
+Element resizing is implemented in CursorRenderer through `resize(id, options)`, `isResizing(id)`, and `stopResize(id)`. The operation resolves a selector inside the mounted container or accepts a contained HTMLElement, creates a temporary selection frame with eight handles, and animates CSS width/height plus the individual `translate` property. Each handle fixes its opposite edge or corner throughout interpolation. The offset calculation uses the computed transform matrix and transform origin to compensate for rotated/scaled/skewed targets; the element's `transform` property is not overwritten.
+
+The renderer preserves the exact original inline width, height, and translate values on cancellation. It locks targets against drag, text insertion, and other cursors' resize operations. Cursor/target removal and renderer destruction release locks, remove handles, and restore styles. When reduced motion becomes active, the resize completes at its target dimensions without continuing an animated timeline. The simulation changes CSS layout dimensions but does not dispatch pointer events.
+
 ## Text insertion simulation
 
 CursorRenderer.typeText(id, options) composes the natural movement engine, existing visual click feedback, a per-cursor GSAP timeline, and a transient caret in the renderer overlay. The cursor follows a cubic Bezier approach to the target center; the target receives programmatic focus and the existing press animation; then a progress tween reveals Unicode code points at a configurable total duration or characterIntervalMs interval. The caret position is estimated from a temporary offscreen text span for inputs/textareas and a collapsed Range for contenteditable, with safe geometry fallbacks.
@@ -84,3 +91,20 @@ VisualEffectsManager is an optional DOM adapter exposed by engine.mountVisualEff
 - clear() removes active effects while preserving the manager; destroy() removes the overlay and restores the container's original inline position.
 
 All effects are opt-in. Target geometry and blueprint bounds are snapshots; call handle.refresh() after layout changes or recreate blueprint mode. Effects are decorative: guide visuals do not implement snapping, selection does not change application state, and no synthetic pointer or keyboard events are emitted. Reduced-motion preference removes the progress-width transition. CursorBuildEngine tracks effect managers and disposes them on destroy().
+
+
+## Cinematic animation engine
+
+`CinematicAnimationEngine` is a framework-independent GSAP adapter exposed as `engine.cinematic`. It can be used without CursorRenderer. Its public primitives include directional text/image/mask reveals, section entrances, parallax offsets, arbitrary transitions, assembly, staggered targets, and caller-authored timelines. Methods return tracked GSAP timelines when motion is enabled; callers can reverse, pause, seek, or compose them. `kill()`, `killAll()`, and `destroy()` release owned timelines and the reduced-motion listener. When reduced motion is active initially, final states are applied immediately; if the preference changes during animation, tracked animations are completed and killed.
+
+The engine does not impose a page layout or cursor dependency. It can be composed with cursor actions through the coordination callback API or added to a scroll-scene GSAP timeline.
+
+## Scroll-driven construction engine
+
+`ScrollConstructionEngine` is exposed as `engine.construction` alongside the lower-level `engine.scroll` manager. Each scene owns a paused GSAP timeline and one ScrollTrigger. Scroll progress is normalized to 0–1 and seeks the timeline; optional reverse-disabled scenes retain their greatest progress. Scenes expose pause/resume, refresh, progress, animation, and destroy APIs. The engine creates, looks up, destroys, refreshes, and disposes multiple independent scenes.
+
+Reduced-motion scenes complete immediately and ignore subsequent scroll updates while the preference is active. Scene destruction kills both the ScrollTrigger and timeline and removes the media-query listener. The scene builder receives the timeline, keeping the construction engine independent of CursorRenderer and allowing caller-authored composition.
+
+## Coordination compatibility
+
+The primary Step 8 API is `engine.coordination`, implemented by `MultiCursorCoordinationEngine` with immutable cursor timelines, explicit dependency graphs, action/group state, abort-aware delays, and cooperative cancellation. The earlier action-array `MultiCursorCoordinator` remains separately available as `engine.coordinator` for compatibility. Individual action cancellation aborts only its own signal; unrelated siblings continue. Explicit group cancellation propagates to all active and scheduled work. The two coordinators have separate state and lifecycle ownership; both are destroyed by `CursorBuildEngine.destroy()`.
