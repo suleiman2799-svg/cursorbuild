@@ -111,7 +111,7 @@ export class VisualEffectsManager {
     this.assertActive(); if (!enabled) return undefined;
     const layer = this.box("cursorbuild-effect-blueprint"), origin = this.origin();
     let outlined = 0;
-    for (const element of this.container.querySelectorAll<HTMLElement>("*")) {
+    for (const element of Array.from(this.container.querySelectorAll<HTMLElement>("*"))) {
       if (outlined >= this.maxBlueprintElements) break;
       if (this.overlay.contains(element)) continue;
       const rect = element.getBoundingClientRect(); if (!rect.width && !rect.height) continue;
