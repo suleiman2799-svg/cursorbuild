@@ -131,7 +131,7 @@ describe("CursorBuildEngine feature integration", () => {
     scene.refresh();
     scene.destroy();
     scene.destroy();
-    expect(engine.construction.getScene("hero-build")).toBe(scene);
+    expect(engine.construction.getScene("hero-build")).toBeUndefined();
     expect(progress.every((value) => value >= 0 && value <= 1)).toBe(true);
     engine.destroy();
   });
