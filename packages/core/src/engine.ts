@@ -7,6 +7,7 @@ import { MultiCursorCoordinationEngine } from "./coordination/multi-cursor-coord
 import { VisualEffectsManager } from "./visual-effects/visual-effects-manager.js";
 import type { CursorRendererOptions } from "./cursor/cursor-renderer.js";
 import type { VisualEffectsOptions } from "./visual-effects/visual-effects-manager.js";
+import { ScrollConstructionEngine } from "./scroll/scroll-construction-engine.js";
 import { ScrollManager } from "./scroll/scroll-manager.js";
 import type { CursorBuildConfig } from "./types.js";
 
@@ -16,6 +17,7 @@ export class CursorBuildEngine {
   readonly animations = new AnimationManager();
   readonly cinematic: CinematicAnimationEngine;
   readonly scroll = new ScrollManager();
+  readonly construction = new ScrollConstructionEngine();
   readonly coordination = new MultiCursorCoordinationEngine();
   private readonly cursorRenderers = new Set<CursorRenderer>();
   private readonly visualEffects = new Set<VisualEffectsManager>();
@@ -53,6 +55,7 @@ export class CursorBuildEngine {
     this.animations.killAll();
     this.cinematic.destroy();
     this.coordination.destroy();
+    this.construction.destroy();
     this.scroll.killAll();
   }
 }
