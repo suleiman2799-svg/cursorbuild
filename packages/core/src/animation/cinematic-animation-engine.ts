@@ -200,6 +200,9 @@ export class CinematicAnimationEngine {
     const cleanup = () => { this.active.delete(timeline); };
     timeline.eventCallback("onComplete", cleanup);
     timeline.eventCallback("onReverseComplete", cleanup);
+    // GSAP invokes onInterrupt when callers kill or otherwise interrupt a
+    // timeline. Unregister it so reduced-motion changes cannot finish stale work.
+    timeline.eventCallback("onInterrupt", cleanup);
   }
 
   private resolveTargets(target: CinematicTarget): Element[] {
