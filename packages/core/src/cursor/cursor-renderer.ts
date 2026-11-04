@@ -594,15 +594,36 @@ export class CursorRenderer {
       return [1, 0, 0, 1] as const;
     })();
     const [ma, mb, mc, md] = transformMatrix;
-    const originParts = computed.transformOrigin.split(/\\s+/);
+    const originParts = computed.transformOrigin.trim().split(/\\s+/).filter(Boolean);
     const originFraction = (value: string | undefined, dimension: number): number => {
       if (!value) return 0.5;
-      if (value.endsWith("%")) return (Number.parseFloat(value) || 0) / 100;
+      const token = value.toLowerCase();
+      if (token === "center") return 0.5;
+      if (token === "left" || token === "top") return 0;
+      if (token === "right" || token === "bottom") return 1;
+      if (value.endsWith("%")) {
+        const percentage = Number.parseFloat(value);
+        return Number.isFinite(percentage) ? percentage / 100 : 0.5;
+      }
       const pixels = Number.parseFloat(value);
       return Number.isFinite(pixels) && dimension > 0 ? pixels / dimension : 0.5;
     };
-    const originX = originFraction(originParts[0], startBoxWidth);
-    const originY = originFraction(originParts[1], startBoxHeight);
+    let [originTokenX, originTokenY] = originParts;
+    if (originParts.length === 1) {
+      if (originTokenX === "top" || originTokenX === "bottom") {
+        originTokenY = originTokenX;
+        originTokenX = "center";
+      } else {
+        originTokenY = "center";
+      }
+    } else if (
+      (originTokenX === "top" || originTokenX === "bottom") &&
+      (originTokenY === "left" || originTokenY === "right")
+    ) {
+      [originTokenX, originTokenY] = [originTokenY, originTokenX];
+    }
+    const originX = originFraction(originTokenX, startBoxWidth);
+    const originY = originFraction(originTokenY, startBoxHeight);
     const getAnchorTranslate = (width: number, height: number): string => {
       const deltaWidth = width - startBoxWidth;
       const deltaHeight = height - startBoxHeight;
