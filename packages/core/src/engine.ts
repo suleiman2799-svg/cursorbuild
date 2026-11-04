@@ -56,12 +56,13 @@ export class CursorBuildEngine {
     this.coordination.destroy();
     this.coordinator.destroy();
     this.construction.destroy();
-    this.scroll.killAll();
+    this.scroll.destroy();
     this.cinematic.destroy();
-    this.animations.killAll();
+    this.animations.destroy();
     this.cursorRenderers.forEach((renderer) => renderer.destroy());
     this.cursorRenderers.clear();
     this.visualEffects.forEach((effects) => effects.destroy());
     this.visualEffects.clear();
+    this.cursors.destroy();
   }
 }

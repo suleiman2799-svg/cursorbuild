@@ -65,7 +65,7 @@ describe("CursorBuildEngine feature integration", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
     window.dispatchEvent(new Event("orientationchange"));
     await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-    expect([...host.querySelectorAll<HTMLElement>(".cursorbuild-cursor")].filter((node) => node.style.display === "flex")).toHaveLength(4);
+    expect(Array.from(host.querySelectorAll<HTMLElement>(".cursorbuild-cursor")).filter((node) => node.style.display === "flex")).toHaveLength(4);
     Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     engine.destroy();
   });
@@ -256,6 +256,9 @@ describe("CursorBuildEngine feature integration", () => {
     expect(group.status).toBe("cancelled");
     expect(() => engine.mountCursors(host)).toThrow(/destroyed/);
     expect(() => engine.mountVisualEffects(host)).toThrow(/destroyed/);
+    expect(() => engine.cursors.add({ id: "late-cursor", name: "Late", color: "#000" })).toThrow(/destroyed/);
+    expect(() => engine.animations.createTimeline("late-animation")).toThrow(/destroyed/);
+    expect(() => engine.scroll.create("late-scroll", { trigger: target })).toThrow(/destroyed/);
     expect(() => engine.cinematic.createTimeline()).toThrow(/destroyed/);
     expect(() => engine.construction.createScene("late", { trigger: target }, () => {})).toThrow(/destroyed/);
     expect(() => engine.coordination.createTimeline("late", [{ id: "late", run: () => {} }])).toThrow(/destroyed/);
