@@ -1,4 +1,5 @@
 import { AnimationManager } from "./animation/animation-manager.js";
+import { CinematicAnimationEngine } from "./animation/cinematic-animation-engine.js";
 import { resolveConfig } from "./config.js";
 import { CursorManager } from "./cursor/cursor-manager.js";
 import { CursorRenderer } from "./cursor/cursor-renderer.js";
@@ -13,13 +14,17 @@ export class CursorBuildEngine {
   readonly config: CursorBuildConfig;
   readonly cursors = new CursorManager();
   readonly animations = new AnimationManager();
+  readonly cinematic: CinematicAnimationEngine;
   readonly scroll = new ScrollManager();
   readonly coordination = new MultiCursorCoordinationEngine();
   private readonly cursorRenderers = new Set<CursorRenderer>();
   private readonly visualEffects = new Set<VisualEffectsManager>();
   private destroyed = false;
 
-  constructor(config: Partial<CursorBuildConfig> = {}) { this.config = resolveConfig(config); }
+  constructor(config: Partial<CursorBuildConfig> = {}) {
+    this.config = resolveConfig(config);
+    this.cinematic = new CinematicAnimationEngine({ respectReducedMotion: this.config.respectReducedMotion });
+  }
 
   /** Attach a visual cursor layer. Coordinates are container-relative CSS pixels. */
   mountCursors(container: HTMLElement, options: CursorRendererOptions = {}): CursorRenderer {
@@ -46,6 +51,7 @@ export class CursorBuildEngine {
     this.visualEffects.forEach((effects) => effects.destroy());
     this.visualEffects.clear();
     this.animations.killAll();
+    this.cinematic.destroy();
     this.coordination.destroy();
     this.scroll.killAll();
   }
