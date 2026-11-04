@@ -51,15 +51,17 @@ export class CursorBuildEngine {
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
-    this.cursorRenderers.forEach((renderer) => renderer.destroy());
-    this.cursorRenderers.clear();
-    this.visualEffects.forEach((effects) => effects.destroy());
-    this.visualEffects.clear();
-    this.animations.killAll();
-    this.cinematic.destroy();
+    // Abort orchestrated work before disposing the timelines and DOM resources
+    // that coordinated callbacks may still be using.
     this.coordination.destroy();
     this.coordinator.destroy();
     this.construction.destroy();
     this.scroll.killAll();
+    this.cinematic.destroy();
+    this.animations.killAll();
+    this.cursorRenderers.forEach((renderer) => renderer.destroy());
+    this.cursorRenderers.clear();
+    this.visualEffects.forEach((effects) => effects.destroy());
+    this.visualEffects.clear();
   }
 }

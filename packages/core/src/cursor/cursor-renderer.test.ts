@@ -104,16 +104,18 @@ describe("CursorRenderer", () => {
   });
 });
 describe("CursorRenderer responsive behaviour", () => {
-  it("limits visible cursor nodes on mobile and restores them on desktop resize", () => {
+  it("limits visible cursor nodes on mobile and restores them on desktop resize", async () => {
     const { manager, host, renderer } = setup([]);
     for (let index = 0; index < 4; index++) manager.add({ id: String(index), name: "Designer " + index, color: "#abc" });
     const originalWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
     window.dispatchEvent(new Event("resize"));
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
     const nodes = Array.from(host.querySelectorAll<HTMLElement>(".cursorbuild-cursor"));
     expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(2);
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
     window.dispatchEvent(new Event("resize"));
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
     expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(4);
     Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     renderer.destroy();

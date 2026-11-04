@@ -8,8 +8,10 @@ import { ScrollConstructionEngine } from "./scroll/scroll-construction-engine.js
 
 describe("CursorBuildEngine feature integration", () => {
   const originalMatchMedia = window.matchMedia;
+  const originalScrollTo = window.scrollTo;
 
   beforeEach(() => {
+    window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
     window.matchMedia = vi.fn((query: string) => ({
       matches: false,
       media: query,
@@ -24,6 +26,7 @@ describe("CursorBuildEngine feature integration", () => {
 
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
+    window.scrollTo = originalScrollTo;
   });
 
   it("constructs the reconciled animation, scroll, and coordination subsystems together", () => {
@@ -81,7 +84,7 @@ describe("CursorBuildEngine feature integration", () => {
     expect(renderer.isResizing("resize-cursor")).toBe(true);
     window.dispatchEvent(new Event("resize"));
     window.dispatchEvent(new Event("orientationchange"));
-    await new Promise<void>((resolve) => timeline?.eventCallback("onComplete", resolve));
+    await timeline?.then(() => undefined);
     expect(renderer.isResizing("resize-cursor")).toBe(false);
     expect(target.style.width).toBe("220px");
     expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
@@ -161,6 +164,12 @@ describe("CursorBuildEngine feature integration", () => {
 
   it("adapts visual-effects cost to viewport changes and bounds trail and blueprint work", async () => {
     const originalWidth = window.innerWidth;
+    const originalHardwareConcurrency = Object.getOwnPropertyDescriptor(navigator, "hardwareConcurrency");
+    const originalDeviceMemory = Object.getOwnPropertyDescriptor(navigator, "deviceMemory");
+    const originalTouchPoints = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
+    Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, value: 8 });
+    Object.defineProperty(navigator, "deviceMemory", { configurable: true, value: 8 });
+    Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 0 });
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
     const host = document.createElement("div");
     for (let index = 0; index < 100; index += 1) {
@@ -180,6 +189,12 @@ describe("CursorBuildEngine feature integration", () => {
     expect(trail.querySelector("polyline")!.getAttribute("points")!.split(" ")).toHaveLength(64);
     expect(effects.setBlueprintMode(true)!.element.childElementCount).toBe(80);
     Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    if (originalHardwareConcurrency) Object.defineProperty(navigator, "hardwareConcurrency", originalHardwareConcurrency);
+    else Reflect.deleteProperty(navigator, "hardwareConcurrency");
+    if (originalDeviceMemory) Object.defineProperty(navigator, "deviceMemory", originalDeviceMemory);
+    else Reflect.deleteProperty(navigator, "deviceMemory");
+    if (originalTouchPoints) Object.defineProperty(navigator, "maxTouchPoints", originalTouchPoints);
+    else Reflect.deleteProperty(navigator, "maxTouchPoints");
     engine.destroy();
   });
 
@@ -206,8 +221,8 @@ describe("CursorBuildEngine feature integration", () => {
     ]);
     const coordinationRun = coordinated.run();
     await Promise.all([
-      new Promise<void>((resolve) => resize?.eventCallback("onComplete", resolve)),
-      new Promise<void>((resolve) => cinematic?.eventCallback("onComplete", resolve)),
+      resize ? resize.then(() => undefined) : Promise.resolve(),
+      cinematic ? cinematic.then(() => undefined) : Promise.resolve(),
       coordinationRun
     ]);
     expect(card.style.width).toBe("100px");
