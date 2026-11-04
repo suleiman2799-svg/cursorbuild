@@ -10,3 +10,17 @@
 .cursorbuild-typing-caret{position:absolute;display:block;width:2px;min-height:1em;pointer-events:none;z-index:4;opacity:1;transform:translateX(-1px);animation:cursorbuild-caret-blink 1s steps(2,start) infinite;box-shadow:0 0 7px currentColor}
 @keyframes cursorbuild-caret-blink{to{opacity:0}}
 @media(prefers-reduced-motion:reduce){.cursorbuild-typing-caret{animation:none}}
+
+
+.cursorbuild-resize-frame{position:absolute;box-sizing:border-box;border:1.5px solid #a99bff;outline:1px solid rgba(169,155,255,.2);pointer-events:none;z-index:5;box-shadow:0 0 0 1px rgba(15,13,22,.25)}
+.cursorbuild-resize-handle{position:absolute;display:block;width:8px;height:8px;box-sizing:border-box;border:1.5px solid #fff;border-radius:2px;background:#a99bff;box-shadow:0 1px 5px rgba(0,0,0,.4);transform:translate(-50%,-50%)}
+.cursorbuild-resize-handle--top-left{left:0;top:0}
+.cursorbuild-resize-handle--top{left:50%;top:0}
+.cursorbuild-resize-handle--top-right{left:100%;top:0}
+.cursorbuild-resize-handle--right{left:100%;top:50%}
+.cursorbuild-resize-handle--bottom-right{left:100%;top:100%}
+.cursorbuild-resize-handle--bottom{left:50%;top:100%}
+.cursorbuild-resize-handle--bottom-left{left:0;top:100%}
+.cursorbuild-resize-handle--left{left:0;top:50%}
+.cursorbuild-resize-frame[data-grabbed] .cursorbuild-resize-handle.is-grabbed{background:#fff;border-color:#a99bff;transform:translate(-50%,-50%) scale(1.35);box-shadow:0 0 0 4px rgba(169,155,255,.2),0 1px 5px rgba(0,0,0,.4)}
+@media(prefers-reduced-motion:reduce){.cursorbuild-resize-handle{transition:none}}
