@@ -148,6 +148,31 @@ describe("CursorRenderer responsive behaviour", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
   });
 
+  it("coalesces resize events into one animation-frame visibility update and cancels pending work on destroy", () => {
+    const originalRequest = window.requestAnimationFrame;
+    const originalCancel = window.cancelAnimationFrame;
+    let frameCallback: FrameRequestCallback | undefined;
+    window.requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      frameCallback = callback;
+      return 99;
+    });
+    window.cancelAnimationFrame = vi.fn();
+
+    const { renderer } = setup(["a", "b", "c"]);
+    window.dispatchEvent(new Event("resize"));
+    window.dispatchEvent(new Event("resize"));
+    expect(window.requestAnimationFrame).toHaveBeenCalledOnce();
+
+    frameCallback?.(0);
+    window.dispatchEvent(new Event("orientationchange"));
+    expect(window.requestAnimationFrame).toHaveBeenCalledTimes(2);
+    renderer.destroy();
+    expect(window.cancelAnimationFrame).toHaveBeenCalledWith(99);
+
+    window.requestAnimationFrame = originalRequest;
+    window.cancelAnimationFrame = originalCancel;
+  });
+
   it("recalculates visibility after orientation changes and validates touch limits", () => {
     const originalWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
