@@ -69,3 +69,18 @@ Sequential tracks add an implicit dependency on the preceding action. Parallel t
 Each action receives its group/action/cursor identifiers, an AbortSignal, and an abort-aware wait helper. Individual cancellation aborts only that action; dependent actions are cancelled rather than being allowed to run against incomplete prerequisites. Group cancellation and engine destruction propagate abort signals to active callbacks. A failed action cancels its siblings and rejects the group's run promise. Since JavaScript cannot forcibly stop arbitrary callback code, action implementations must cooperate with the supplied signal and return a promise that settles when their work ends.
 
 The action callback is the integration seam for movement, clicking, dragging, text insertion, resizing, cinematic animations, and scroll-driven scenes. For GSAP-backed operations, return or await the timeline so the dependency graph reflects actual animation completion. Void-returning visual effects can use the context wait helper when subsequent actions need to be delayed. No imports from React, CursorRenderer, CinematicAnimationEngine, or ScrollConstructionEngine are required, so these systems remain independently usable and can evolve on separate feature branches.
+
+
+## Advanced visual effects
+
+VisualEffectsManager is an optional DOM adapter exposed by engine.mountVisualEffects(container, options). It owns one absolute-positioned overlay with pointer-events disabled and never adds layout-affecting styles to target elements. It is independent of CursorRenderer and can be mounted alone or alongside cursor rendering.
+
+- highlight() and showSelectionBox() create geometry-aligned boxes and return handles with refresh() and destroy().
+- showGuides() and showSnapGuide() draw vertical/horizontal alignment indicators and return cleanup callbacks.
+- showMeasurement() draws a labelled distance line between container-relative points.
+- showGrid() draws an opt-in CSS grid; setBlueprintMode(true) snapshots element bounds into an overlay.
+- showCursorTrail() draws a pointer-transparent SVG polyline from supplied points.
+- setProgress() and complete() update a visual progress bar.
+- clear() removes active effects while preserving the manager; destroy() removes the overlay and restores the container's original inline position.
+
+All effects are opt-in. Target geometry and blueprint bounds are snapshots; call handle.refresh() after layout changes or recreate blueprint mode. Effects are decorative: guide visuals do not implement snapping, selection does not change application state, and no synthetic pointer or keyboard events are emitted. Reduced-motion preference removes the progress-width transition. CursorBuildEngine tracks effect managers and disposes them on destroy().
