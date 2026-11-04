@@ -543,7 +543,7 @@ describe("CursorRenderer element resizing simulation", () => {
     });
   });
 
-  it("keeps the opposite anchor fixed for a rotated and scaled target", () => {
+  it("keeps the opposite anchor fixed for a rotated target", () => {
     const { host, renderer } = setup(["a"]);
     const target = addResizeTarget(host);
     target.style.width = "100px";
@@ -551,6 +551,19 @@ describe("CursorRenderer element resizing simulation", () => {
     target.style.translate = "12px 4px";
     target.style.transform = "matrix(0, 1, -1, 0, 0, 0)";
     target.style.transformOrigin = "50% 50%";
+    const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation((element) => {
+      if (element === target) {
+        return {
+          width: "100px", height: "80px", boxSizing: "content-box",
+          paddingLeft: "0px", paddingRight: "0px", borderLeftWidth: "0px", borderRightWidth: "0px",
+          paddingTop: "0px", paddingBottom: "0px", borderTopWidth: "0px", borderBottomWidth: "0px",
+          translate: "12px 4px", transform: "matrix(0, 1, -1, 0, 0, 0)",
+          transformOrigin: "50% 50%"
+        } as CSSStyleDeclaration;
+      }
+      return nativeGetComputedStyle(element);
+    });
     const rect = () => ({
       x: 10, y: 20, left: 10, top: 20, right: 110, bottom: 100,
       width: 100, height: 80, toJSON: () => ({})
