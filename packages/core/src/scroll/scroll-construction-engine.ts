@@ -43,7 +43,8 @@ export class ScrollConstructionScene {
   constructor(
     readonly id: string,
     private readonly timeline: gsap.core.Timeline,
-    options: ScrollConstructionSceneOptions
+    options: ScrollConstructionSceneOptions,
+    private readonly onDestroy?: () => void
   ) {
     this.allowReverse = options.reverse ?? true;
     this.onProgress = options.onProgress;
@@ -101,6 +102,7 @@ export class ScrollConstructionScene {
     this.triggerInstance.kill();
     this.mediaQuery?.removeEventListener?.("change", this.handleMotionChange);
     this.timeline.kill();
+    this.onDestroy?.();
   }
 
   private applyProgress(progress: number): void {
@@ -141,7 +143,9 @@ export class ScrollConstructionEngine {
     try {
       build(timeline);
       timeline.progress(0);
-      const scene = new ScrollConstructionScene(id, timeline, options);
+      const scene = new ScrollConstructionScene(id, timeline, options, () => {
+        if (this.scenes.get(id) === scene) this.scenes.delete(id);
+      });
       this.scenes.set(id, scene);
       return scene;
     } catch (error) {

@@ -33,7 +33,9 @@ export class VisualEffectsManager {
   private readonly configuredMaxBlueprintElements?: number;
   private readonly coarsePointerQuery?: MediaQueryList;
   private viewportFrame?: number;
-  private readonly reducedMotion: boolean;
+  private readonly reducedMotionQuery?: MediaQueryList;
+  private readonly respectReducedMotion: boolean;
+  private reducedMotion: boolean;
   private readonly originalPosition: string;
   private readonly changedPosition: boolean;
   private readonly handles = new Set<VisualEffectHandle>();
@@ -64,7 +66,12 @@ export class VisualEffectsManager {
     const position = window.getComputedStyle(container).position;
     this.changedPosition = !position || position === "static";
     if (this.changedPosition) container.style.position = "relative";
-    this.reducedMotion = (options.respectReducedMotion ?? true) && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this.respectReducedMotion = options.respectReducedMotion ?? true;
+    this.reducedMotionQuery = typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)")
+      : undefined;
+    this.reducedMotion = this.respectReducedMotion && !!this.reducedMotionQuery?.matches;
+    this.reducedMotionQuery?.addEventListener?.("change", this.handleMotionChange);
     this.overlay = document.createElement("div"); this.overlay.className = "cursorbuild-effects";
     this.overlay.setAttribute("aria-hidden", "true");
     Object.assign(this.overlay.style, { position: "absolute", inset: "0", width: "100%", height: "100%", overflow: "visible", pointerEvents: "none", zIndex: String(this.zIndex), contain: "layout style", isolation: "isolate" });
@@ -184,6 +191,7 @@ export class VisualEffectsManager {
     this.clear();
     window.removeEventListener("resize", this.handleViewportChange);
     this.coarsePointerQuery?.removeEventListener?.("change", this.handleViewportChange);
+    this.reducedMotionQuery?.removeEventListener?.("change", this.handleMotionChange);
     if (this.viewportFrame !== undefined && typeof window.cancelAnimationFrame === "function") {
       window.cancelAnimationFrame(this.viewportFrame);
       this.viewportFrame = undefined;
@@ -203,6 +211,11 @@ export class VisualEffectsManager {
     );
     return touchDevice || constrainedHardware || window.innerWidth <= 600 ? "performance" : "balanced";
   }
+  private readonly handleMotionChange = (event: MediaQueryListEvent): void => {
+    this.reducedMotion = this.respectReducedMotion && event.matches;
+    const fill = this.progress?.firstElementChild as HTMLElement | null;
+    if (fill) fill.style.transition = this.reducedMotion || this.performanceMode === "performance" ? "none" : "width 180ms ease";
+  };
   private readonly handleViewportChange = (): void => {
     if (this.destroyed || this.requestedMode !== "auto" || this.viewportFrame !== undefined) return;
     const update = (): void => {
@@ -214,6 +227,8 @@ export class VisualEffectsManager {
       if (this.configuredGridSize === undefined) this.gridSize = nextMode === "performance" ? 40 : 24;
       if (this.configuredMaxTrailPoints === undefined) this.maxTrailPoints = nextMode === "quality" ? 1024 : nextMode === "performance" ? 64 : 256;
       if (this.configuredMaxBlueprintElements === undefined) this.maxBlueprintElements = nextMode === "quality" ? 1000 : nextMode === "performance" ? 80 : 250;
+      const fill = this.progress?.firstElementChild as HTMLElement | null;
+      if (fill) fill.style.transition = this.reducedMotion || nextMode === "performance" ? "none" : "width 180ms ease";
     };
     if (typeof window.requestAnimationFrame === "function") {
       this.viewportFrame = window.requestAnimationFrame(update);
