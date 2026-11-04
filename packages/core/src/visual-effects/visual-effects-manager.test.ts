@@ -51,6 +51,47 @@ describe("VisualEffectsManager", () => {
     expect(manager!.overlay.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")).toBe("100");
     expect(manager!.overlay.querySelector('[role="progressbar"]')?.getAttribute("data-complete")).toBe("true");
   });
+  it("bounds trail and blueprint rendering in the performance profile", () => {
+    container = document.createElement("div");
+    for (let index = 0; index < 5; index += 1) {
+      const item = document.createElement("div");
+      item.textContent = "item " + index;
+      item.getBoundingClientRect = () => ({
+        left: index * 10, top: 0, right: index * 10 + 8, bottom: 8,
+        width: 8, height: 8, x: index * 10, y: 0, toJSON: () => ({})
+      } as DOMRect);
+      container.appendChild(item);
+    }
+    document.body.appendChild(container);
+    manager = new VisualEffectsManager(container, {
+      performanceMode: "performance",
+      maxTrailPoints: 4,
+      maxBlueprintElements: 2
+    });
+
+    const trail = manager.showCursorTrail(Array.from({ length: 10 }, (_, index) => ({ x: index, y: index * 2 })));
+    const points = trail.querySelector("polyline")!.getAttribute("points")!.split(" ");
+    expect(points).toHaveLength(4);
+    expect(points[0]).toBe("0,0");
+    expect(points[3]).toBe("9,18");
+
+    const blueprint = manager.setBlueprintMode(true)!;
+    expect(blueprint.element.childElementCount).toBe(2);
+    expect(manager.showGrid().element.style.backgroundSize).toBe("40px 40px");
+    manager.setProgress(0.5);
+    expect((manager.overlay.querySelector(".cursorbuild-effect-progress__fill") as HTMLElement).style.transition).toBe("none");
+  });
+
+  it("automatically selects the lighter effects profile on a small viewport", () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    manager = new VisualEffectsManager(container);
+    expect(manager.showGrid().element.style.backgroundSize).toBe("40px 40px");
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+  });
+
   it("clear removes every active effect, including transient guides, measurements, and trails", () => {
     setup();
     const highlight = manager!.highlight("#card");
