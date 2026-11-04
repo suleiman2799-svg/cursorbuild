@@ -56,10 +56,13 @@ describe("VisualEffectsManager", () => {
     for (let index = 0; index < 5; index += 1) {
       const item = document.createElement("div");
       item.textContent = "item " + index;
-      item.getBoundingClientRect = () => ({
-        left: index * 10, top: 0, right: index * 10 + 8, bottom: 8,
-        width: 8, height: 8, x: index * 10, y: 0, toJSON: () => ({})
-      } as DOMRect);
+      item.getBoundingClientRect = () => {
+        expect(manager!.overlay.querySelector(".cursorbuild-effect-blueprint")).toBeNull();
+        return {
+          left: index * 10, top: 0, right: index * 10 + 8, bottom: 8,
+          width: 8, height: 8, x: index * 10, y: 0, toJSON: () => ({})
+        } as DOMRect;
+      };
       container.appendChild(item);
     }
     document.body.appendChild(container);
