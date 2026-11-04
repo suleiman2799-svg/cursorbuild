@@ -38,7 +38,7 @@ The press animation scales the existing SVG pointer down and back to its resting
 
 ## Extension approach
 
-Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport, real collaboration networking, drag/drop, resizing, text insertion, and construction-scene authoring are future modules, not part of the current renderer.
+Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport and real collaboration networking remain future modules. Drag/drop, resizing, text insertion, cinematic animation, scroll-driven construction, and visual effects are implemented as separate modules/adapters, not responsibilities of the cursor renderer.
 
 ## Drag-and-drop simulation
 
