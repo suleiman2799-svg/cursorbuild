@@ -2,15 +2,18 @@
 
 **CursorBuild** is an open-source, modular TypeScript toolkit for building visual website-construction scenes with multiple collaborator cursors. Its framework-independent core provides cursor rendering and animation, interaction simulations, multi-cursor orchestration, and optional visual-effect overlays.
 
-> **Project status: active development.** The foundation, cursor rendering and motion, drag/drop simulation, text insertion simulation, Step 8 multi-cursor coordination, and Step 9 advanced visual effects are implemented on the current development branch. Element resizing, cinematic animation, scroll-driven construction, reusable presets, broader examples, and release readiness remain future work; Step 10 responsive/performance improvements are implemented on this branch. The npm packages are workspace packages in this repository; this README does not imply that they have been published to npm.
+> **Project status: active development.** The foundation, cursor rendering and motion, drag/drop and text insertion simulations, element resizing, cinematic animation, scroll-driven construction, Step 8 multi-cursor coordination, Step 9 advanced visual effects, and Step 10 responsive/performance improvements are implemented. Reusable presets, expanded examples, physical-device profiling, and release readiness remain future work. The npm packages are workspace packages in this repository; this README does not imply that they have been published to npm.
 
 ## Implemented functionality
 
 - **Cursor rendering:** multiple named, coloured DOM cursors with container-relative coordinates, desktop/tablet/mobile visibility limits, an additional coarse-pointer cap, viewport/orientation updates, and reduced-motion support.
 - **Movement and click feedback:** direct movement, curved natural paths and sequences, plus configurable press and ripple feedback.
-- **Interaction simulations:** visual drag/drop with per-element locking, and progressive text insertion into supported inputs, textareas, and contenteditable targets.
+- **Interaction simulations:** visual drag/drop with per-element locking, progressive text insertion into supported inputs, textareas, and contenteditable targets, and animated element resizing with eight handles and fixed opposite anchors.
+- **Cinematic animations:** independent text/image/mask reveals, section entrances, parallax, transitions, assembly, staggered sequences, configurable timing, and reduced-motion handling.
+- **Scroll-driven construction:** section-based scenes with scroll progress, sequencing, pause/resume, reverse playback, refresh, and scene cleanup.
 - **Step 8 — Multi-cursor coordination:** independent cursor timelines, sequential or parallel actions, cross-cursor dependencies, group/timeline/action delays, individual and group cancellation, abort signals, and engine lifecycle cleanup.
 - **Step 9 — Advanced visual effects:** optional highlights, selection boxes, alignment and snap guides, measurement lines, grid overlays, blueprint snapshots, SVG cursor trails, and construction progress/completion feedback. Effects support adaptive quality/performance profiles with configurable trail and blueprint limits.
+- **Step 10 — Responsive/performance:** desktop, tablet, mobile and coarse-pointer visibility caps; viewport/orientation updates; adaptive visual-effect quality; bounded trail/blueprint workloads; and listener/frame cleanup.
 - **Framework integration:** optional React provider and hooks; React is not a dependency of the core runtime.
 
 These features are visual simulations. CursorBuild does not dispatch synthetic mouse, pointer, keyboard, beforeinput, or input events. Dragging does not implement native browser drag-and-drop, guide indicators do not perform snapping, and visual selection does not mutate application state.
@@ -339,6 +342,8 @@ GitHub Actions runs tests, type checks, and builds for pushes to development bra
 | Cursor rendering, natural movement, click feedback, responsive visibility and reduced-motion handling | Implemented |
 | Drag/drop and text insertion simulations | Implemented |
 | Step 8 — multi-cursor coordination engine | Implemented |
+| Step 6 — cinematic animation engine | Implemented |
+| Step 7 — scroll-driven construction engine | Implemented |
 | Step 9 — advanced visual effects | Implemented |
 | Step 10 — responsive and performance optimisation | Implemented on this branch |
 | Element resizing and positioning | Planned |
