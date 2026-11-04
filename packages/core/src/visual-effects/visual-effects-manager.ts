@@ -109,17 +109,24 @@ export class VisualEffectsManager {
   }
   setBlueprintMode(enabled: boolean): VisualEffectHandle | undefined {
     this.assertActive(); if (!enabled) return undefined;
-    const layer = this.box("cursorbuild-effect-blueprint"), origin = this.origin();
+    // Build the snapshot off-DOM: interleaving DOM writes with geometry reads
+    // would repeatedly invalidate layout on large pages.
+    const layer = document.createElement("div");
+    layer.className = "cursorbuild-effect-blueprint";
+    Object.assign(layer.style, { position: "absolute", inset: "0", pointerEvents: "none" });
+    const origin = this.origin();
     let outlined = 0;
     for (const element of Array.from(this.container.querySelectorAll<HTMLElement>("*"))) {
       if (outlined >= this.maxBlueprintElements) break;
       if (this.overlay.contains(element)) continue;
-      const rect = element.getBoundingClientRect(); if (!rect.width && !rect.height) continue;
+      const rect = element.getBoundingClientRect();
+      if (!rect.width && !rect.height) continue;
       outlined += 1;
       const outline = document.createElement("div");
       Object.assign(outline.style, { position: "absolute", left: rect.left - origin.x + "px", top: rect.top - origin.y + "px", width: rect.width + "px", height: rect.height + "px", border: "1px solid rgba(56,189,248,.55)", boxSizing: "border-box" });
       layer.appendChild(outline);
     }
+    this.overlay.appendChild(layer);
     return this.track(layer, () => {});
   }
   showCursorTrail(points: readonly VisualPoint[], options: TrailOptions = {}): SVGSVGElement {
