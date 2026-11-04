@@ -543,6 +543,50 @@ describe("CursorRenderer element resizing simulation", () => {
     });
   });
 
+  it.each([
+    ["20% 70%", -72, -26],
+    ["left top", -80, -40],
+    ["20px 56px", -72, -26]
+  ])("parses transform-origin %s while preserving a scaled opposite anchor", (origin, expectedX, expectedY) => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    target.style.width = "100px";
+    target.style.height = "80px";
+    target.style.transform = "matrix(2, 0, 0, 2, 0, 0)";
+    target.style.transformOrigin = origin;
+    const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation((element) => {
+      if (element === target) {
+        return {
+          width: "100px", height: "80px", boxSizing: "content-box",
+          paddingLeft: "0px", paddingRight: "0px", borderLeftWidth: "0px", borderRightWidth: "0px",
+          paddingTop: "0px", paddingBottom: "0px", borderTopWidth: "0px", borderBottomWidth: "0px",
+          translate: "none", transform: "matrix(2, 0, 0, 2, 0, 0)", transformOrigin: origin
+        } as CSSStyleDeclaration;
+      }
+      return nativeGetComputedStyle(element);
+    });
+
+    renderer.resize("a", { target, to: { width: 140, height: 100 }, handle: "top-left" });
+    const tween = gsapState.timelines[gsapState.timelines.length - 1].to.mock.calls[1];
+    const progress = tween[0] as { value: number };
+    const onUpdate = tween[1].onUpdate as () => void;
+
+    progress.value = 0.5;
+    onUpdate();
+    expect(target.style.translate).toBe(
+      "calc(0px + " + expectedX / 2 + "px) calc(0px + " + expectedY / 2 + "px)"
+    );
+    progress.value = 1;
+    onUpdate();
+    expect(target.style.translate).toBe(
+      "calc(0px + " + expectedX + "px) calc(0px + " + expectedY + "px)"
+    );
+    renderer.stopResize("a");
+    expect(target.style.translate).toBe("");
+    expect(host.querySelector(".cursorbuild-resize-frame")).toBeNull();
+  });
+
   it("keeps the opposite anchor fixed for a rotated target", () => {
     const { host, renderer } = setup(["a"]);
     const target = addResizeTarget(host);
