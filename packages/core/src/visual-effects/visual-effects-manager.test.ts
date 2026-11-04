@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { VisualEffectsManager } from "./visual-effects-manager.js";
 
 describe("VisualEffectsManager", () => {
@@ -51,6 +51,121 @@ describe("VisualEffectsManager", () => {
     expect(manager!.overlay.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow")).toBe("100");
     expect(manager!.overlay.querySelector('[role="progressbar"]')?.getAttribute("data-complete")).toBe("true");
   });
+  it("bounds trail and blueprint rendering in the performance profile", () => {
+    container = document.createElement("div");
+    let geometryReads = 0;
+    for (let index = 0; index < 5; index += 1) {
+      const item = document.createElement("div");
+      item.textContent = "item " + index;
+      item.getBoundingClientRect = () => {
+        geometryReads += 1;
+        expect(manager!.overlay.querySelector(".cursorbuild-effect-blueprint")).toBeNull();
+        return {
+          left: index * 10, top: 0, right: index * 10 + 8, bottom: 8,
+          width: 8, height: 8, x: index * 10, y: 0, toJSON: () => ({})
+        } as DOMRect;
+      };
+      container.appendChild(item);
+    }
+    document.body.appendChild(container);
+    manager = new VisualEffectsManager(container, {
+      performanceMode: "performance",
+      maxTrailPoints: 4,
+      maxBlueprintElements: 2
+    });
+
+    const trail = manager.showCursorTrail(Array.from({ length: 10 }, (_, index) => ({ x: index, y: index * 2 })));
+    const points = trail.querySelector("polyline")!.getAttribute("points")!.split(" ");
+    expect(points).toHaveLength(4);
+    expect(points[0]).toBe("0,0");
+    expect(points[3]).toBe("9,18");
+
+    const blueprint = manager.setBlueprintMode(true)!;
+    expect(blueprint.element.childElementCount).toBe(2);
+    expect(geometryReads).toBe(2);
+    expect(manager.showGrid().element.style.backgroundSize).toBe("40px 40px");
+    manager.setProgress(0.5);
+    expect((manager.overlay.querySelector(".cursorbuild-effect-progress__fill") as HTMLElement).style.transition).toBe("none");
+  });
+
+  it("automatically selects the lighter effects profile on a small viewport", () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    manager = new VisualEffectsManager(container);
+    expect(manager.showGrid().element.style.backgroundSize).toBe("40px 40px");
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+  });
+
+  it("reselects auto performance profiles across desktop and mobile viewport changes without repeated frame work", () => {
+    const originalWidth = Object.getOwnPropertyDescriptor(window, "innerWidth");
+    const originalRaf = Object.getOwnPropertyDescriptor(window, "requestAnimationFrame");
+    const originalCancel = Object.getOwnPropertyDescriptor(window, "cancelAnimationFrame");
+    const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
+    const originalTouchPoints = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
+    const originalHardwareConcurrency = Object.getOwnPropertyDescriptor(navigator, "hardwareConcurrency");
+    const originalDeviceMemory = Object.getOwnPropertyDescriptor(navigator, "deviceMemory");
+    let scheduled: FrameRequestCallback | undefined;
+    let nextFrame = 0;
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      scheduled = callback;
+      nextFrame += 1;
+      return nextFrame;
+    });
+    const cancelFrame = vi.fn();
+    Object.defineProperty(window, "requestAnimationFrame", { configurable: true, value: requestFrame });
+    Object.defineProperty(window, "cancelAnimationFrame", { configurable: true, value: cancelFrame });
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })
+    });
+    Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 0 });
+    Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, value: 8 });
+    Object.defineProperty(navigator, "deviceMemory", { configurable: true, value: 8 });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+    try {
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      manager = new VisualEffectsManager(container);
+      expect(manager.showGrid().element.style.backgroundSize).toBe("24px 24px");
+
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+      window.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new Event("resize"));
+      expect(requestFrame).toHaveBeenCalledOnce();
+      scheduled?.(0);
+      expect(manager.showGrid().element.style.backgroundSize).toBe("40px 40px");
+
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+      window.dispatchEvent(new Event("resize"));
+      scheduled?.(16);
+      expect(manager.showGrid().element.style.backgroundSize).toBe("24px 24px");
+
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+      window.dispatchEvent(new Event("resize"));
+      manager.destroy();
+      expect(cancelFrame).toHaveBeenCalledWith(3);
+      window.dispatchEvent(new Event("resize"));
+      expect(requestFrame).toHaveBeenCalledTimes(3);
+    } finally {
+      if (originalWidth) Object.defineProperty(window, "innerWidth", originalWidth);
+      else Reflect.deleteProperty(window, "innerWidth");
+      if (originalRaf) Object.defineProperty(window, "requestAnimationFrame", originalRaf);
+      else Reflect.deleteProperty(window, "requestAnimationFrame");
+      if (originalCancel) Object.defineProperty(window, "cancelAnimationFrame", originalCancel);
+      else Reflect.deleteProperty(window, "cancelAnimationFrame");
+      if (originalMatchMedia) Object.defineProperty(window, "matchMedia", originalMatchMedia);
+      else Reflect.deleteProperty(window, "matchMedia");
+      if (originalTouchPoints) Object.defineProperty(navigator, "maxTouchPoints", originalTouchPoints);
+      else Reflect.deleteProperty(navigator, "maxTouchPoints");
+      if (originalHardwareConcurrency) Object.defineProperty(navigator, "hardwareConcurrency", originalHardwareConcurrency);
+      else Reflect.deleteProperty(navigator, "hardwareConcurrency");
+      if (originalDeviceMemory) Object.defineProperty(navigator, "deviceMemory", originalDeviceMemory);
+      else Reflect.deleteProperty(navigator, "deviceMemory");
+    }
+  });
+
   it("clear removes every active effect, including transient guides, measurements, and trails", () => {
     setup();
     const highlight = manager!.highlight("#card");

@@ -182,6 +182,22 @@ describe("MultiCursorCoordinator", () => {
     expect(animation.animation.kill).toHaveBeenCalledOnce();
   });
 
+  it("treats an application-thrown AbortError as a genuine group failure", async () => {
+    const coordinator = setup();
+    const sibling = createAnimation();
+    const applicationAbort = new Error("application callback aborted independently");
+    applicationAbort.name = "AbortError";
+    const done = coordinator.runGroup("application-abort", [
+      { id: "sibling", cursorId: "maya", run: () => sibling.animation as never },
+      { id: "application-failure", cursorId: "noah", run: () => { throw applicationAbort; } }
+    ]);
+
+    await expect(done).rejects.toBe(applicationAbort);
+    expect(sibling.animation.kill).toHaveBeenCalledOnce();
+    expect(coordinator.getActiveActionIds()).toEqual([]);
+    expect(coordinator.getActiveGroupIds()).toEqual([]);
+  });
+
   it("validates group ids, action ids, dependencies, cycles, and delays", async () => {
     const coordinator = setup();
     const action = [{ id: "one", cursorId: "maya", run: () => undefined }];
