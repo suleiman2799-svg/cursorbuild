@@ -66,16 +66,6 @@ export default function App() {
   renderer.drag("maya", { target: "#drag-card-one", to: { x: Math.max(12, width * 0.56), y: Math.max(12, height * 0.2) }, duration: 1.25, curvature: 0.2 });
   renderer.drag("noah", { target: "#drag-card-two", to: { x: Math.max(12, width * 0.12), y: Math.max(12, height * 0.62) }, duration: 1.45, curvature: 0.16 });
  }
- function replayCinematic() {
-  const cinematic = engine.cinematic;
-  cinematic.revealText("#cinematic-title", { direction: "left", duration: 0.8, ease: "power3.out" });
-  cinematic.revealImage("#cinematic-artwork", { direction: "right", duration: 1.1, delay: 0.12 });
-  cinematic.stagger(".cinematic-card", {
-   from: { opacity: 0, y: 22, scale: 0.96 },
-   to: { opacity: 1, y: 0, scale: 1 },
-   duration: 0.55, stagger: 0.14, delay: 0.18
-  });
- }
  return <main className="shell">
   <nav><span className="mark">C</span><span>CURSORBUILD</span><span className="nav-tag">MULTI-CURSOR ENGINE · 0.3</span></nav>
   <section className="hero"><p className="eyebrow">COLLABORATION, IN MOTION</p><h1>Many hands.<br/><em>One canvas.</em></h1>
@@ -93,15 +83,6 @@ export default function App() {
    <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={!cursors.some((cursor) => cursor.id.startsWith("guest-"))}>− Remove cursor</button> <button onClick={replayTextInsertion}>⌨ Replay typing demo</button> <button onClick={replayDrags}>↻ Replay drag demo</button></div></div>
    <div className="cursor-legend">{cursors.map((cursor) => <span className="cursor-chip" key={cursor.id}><i style={{background:cursor.color}}/>{cursor.name}</span>)}</div>
   </section>
-  <section className="panel cinematic-panel">
-   <div className="panel-head"><div><p className="eyebrow">CINEMATIC ANIMATION ENGINE</p><h2>Bring the canvas to life</h2></div><span className="count">TEXT · IMAGE · STAGGER</span></div>
-   <div className="cinematic-stage">
-    <div className="cinematic-copy"><span className="stage-kicker">A SEPARATE ANIMATION SYSTEM</span><h3 id="cinematic-title">A little motion makes a big impression.</h3><p>Reveal text and artwork, then assemble a set of interface cards with a configurable stagger.</p></div>
-    <div id="cinematic-artwork" className="cinematic-artwork" role="img" aria-label="Abstract layered artwork"><span/><i/><b/></div>
-    <div className="cinematic-cards"><article className="cinematic-card"><small>01 / DISCOVER</small><strong>Shape the story</strong></article><article className="cinematic-card"><small>02 / DESIGN</small><strong>Build the details</strong></article><article className="cinematic-card"><small>03 / DELIVER</small><strong>Make it memorable</strong></article></div>
-   </div>
-   <div className="cursor-controls"><p>REUSABLE GSAP PRIMITIVES · FRAMEWORK INDEPENDENT</p><div><button className="primary" onClick={replayCinematic}>✦ Replay cinematic demo</button></div></div>
-  </section>
-  <footer><span>FOUNDATION + MOVEMENT + CLICK + DRAG + TEXT + CINEMATIC · v0.5.0</span><span>Cursor simulation and cinematic animation can run independently.</span></footer>
+  <footer><span>FOUNDATION + MOVEMENT + CLICK + DRAG + TEXT · v0.4.0</span><span>Visual pointers never intercept page interaction.</span></footer>
  </main>;
 }

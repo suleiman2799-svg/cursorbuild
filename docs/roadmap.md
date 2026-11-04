@@ -21,12 +21,12 @@
 
 ## Interaction primitives
 - [x] Configurable drag/drop simulation with per-cursor timelines and element locking
-- [ ] Element resizing and positioning (implementation is under review in PR #6)
+- [ ] Element resizing and positioning
 - [x] Animated text insertion simulation with caret feedback and target locking
 
 ## Orchestration
 - [ ] Declarative timelines and reusable scroll scenes
-- [ ] Multi-cursor coordination and conflict rules
+- [x] Multi-cursor coordination engine: independent cursor timelines, parallel/sequential groups, cross-cursor dependencies, delays, cancellation, and lifecycle cleanup (Step 8 PR)
 - [ ] Responsive scene composition and reduced-motion strategy
 
 ## Ecosystem
@@ -35,21 +35,20 @@
 - [ ] Accessibility and performance benchmarks
 - [ ] Release automation
 
-## Cinematic animation engine — implemented in PR #7
-- [x] Directional text, image, and clip-mask reveals
-- [x] Configurable section entrance and element assembly animations
-- [x] Axis-based parallax tweens and arbitrary smooth transitions
-- [x] Staggered multi-element timelines
-- [x] Configurable duration, easing, delay, and stagger
-- [x] Reversible GSAP timelines and explicit lifecycle cleanup
-- [x] Reduced-motion immediate completion and active-animation settlement
-- [x] Standalone framework-independent API and engine-owned instance
-- [x] Responsive demo showcase
+
+## Step 9 — Advanced visual effects
+- [x] Optional selection boxes and element highlighting
+- [x] Alignment guides and snap-guide indicators
+- [x] Measurement indicators and grid overlays
+- [x] Blueprint snapshots and cursor trails
+- [x] Construction progress and completion feedback
+- [x] Pointer-transparent overlay and engine lifecycle cleanup
+- [x] Automated tests and API documentation
 
 ## Remaining milestones
-- [ ] Scroll-driven construction scenes
-- [ ] Multi-cursor coordination
-- [ ] Advanced configurable visual effects
-- [ ] Responsive/performance profiling and browser-level validation
-- [ ] Reusable presets, complete developer docs, playground, and integration examples
-- [ ] Release readiness (no package publication without explicit approval)
+- [ ] Step 10 — Responsive and performance optimisation
+- [ ] Step 11 — Reusable component and preset library
+- [ ] Step 12 — Complete documentation and developer experience
+- [ ] Step 13 — Demo website and playground
+- [ ] Step 14 — Examples and integration
+- [ ] Step 15 — Package and release readiness
