@@ -572,10 +572,53 @@ export class CursorRenderer {
     const baseTranslateZ = translateParts[2];
     const composeTranslate = (dx: number, dy: number) =>
       `calc(${baseTranslateX} + ${dx}px) calc(${baseTranslateY} + ${dy}px)${baseTranslateZ ? " " + baseTranslateZ : ""}`;
+    // CSS transforms can rotate, scale, or skew the resized box. A change to
+    // its dimensions moves the fixed local anchor by both the transformed
+    // anchor delta and the transform-origin delta. Counter-translate that
+    // screen-space displacement so the opposite anchor stays stationary.
+    const transformMatrix = (() => {
+      const value = computed.transform;
+      if (!value || value === "none") return [1, 0, 0, 1] as const;
+      const match2d = value.match(/^matrix\\(([^)]+)\\)$/);
+      if (match2d) {
+        const values = match2d[1]!.split(",").map(Number);
+        if (values.length === 6 && values.every(Number.isFinite)) return [values[0]!, values[1]!, values[2]!, values[3]!] as const;
+      }
+      const match3d = value.match(/^matrix3d\\(([^)]+)\\)$/);
+      if (match3d) {
+        const values = match3d[1]!.split(",").map(Number);
+        if (values.length === 16 && values.every(Number.isFinite)) return [values[0]!, values[1]!, values[4]!, values[5]!] as const;
+      }
+      // Browsers expose computed transforms as matrices. Fall back to the
+      // identity for non-matrix values in DOM shims that do not resolve CSS.
+      return [1, 0, 0, 1] as const;
+    })();
+    const [ma, mb, mc, md] = transformMatrix;
+    const originParts = computed.transformOrigin.split(/\\s+/);
+    const originFraction = (value: string | undefined, dimension: number): number => {
+      if (!value) return 0.5;
+      if (value.endsWith("%")) return (Number.parseFloat(value) || 0) / 100;
+      const pixels = Number.parseFloat(value);
+      return Number.isFinite(pixels) && dimension > 0 ? pixels / dimension : 0.5;
+    };
+    const originX = originFraction(originParts[0], startBoxWidth);
+    const originY = originFraction(originParts[1], startBoxHeight);
     const setAnchorOffset = (width: number, height: number) => {
-      const dx = handle.includes("left") ? startBoxWidth - width : 0;
-      const dy = handle.includes("top") ? startBoxHeight - height : 0;
-      element.style.translate = dx === 0 && dy === 0 ? originalTranslate : composeTranslate(dx, dy);
+      const deltaWidth = width - startBoxWidth;
+      const deltaHeight = height - startBoxHeight;
+      const anchorX = handle.includes("left") ? deltaWidth : 0;
+      const anchorY = handle.includes("top") ? deltaHeight : 0;
+      const originDeltaX = originX * deltaWidth;
+      const originDeltaY = originY * deltaHeight;
+      const transformedAnchorX = ma * anchorX + mc * anchorY;
+      const transformedAnchorY = mb * anchorX + md * anchorY;
+      const transformedOriginX = (1 - ma) * originDeltaX - mc * originDeltaY;
+      const transformedOriginY = -mb * originDeltaX + (1 - md) * originDeltaY;
+      const dx = -(transformedAnchorX + transformedOriginX);
+      const dy = -(transformedAnchorY + transformedOriginY);
+      element.style.translate = Math.abs(dx) < 1e-8 && Math.abs(dy) < 1e-8
+        ? originalTranslate
+        : composeTranslate(dx, dy);
     };
     const targetOffsetX = handle.includes("left") ? startBoxWidth - targetBoxWidth : 0;
     const targetOffsetY = handle.includes("top") ? startBoxHeight - targetBoxHeight : 0;
