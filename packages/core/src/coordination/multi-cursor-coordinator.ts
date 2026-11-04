@@ -32,6 +32,13 @@ interface ActiveAction {
 
 type AnimationCallback = (this: gsap.core.Animation, ...args: unknown[]) => void;
 
+class CoordinatorCancellationError extends Error {
+  constructor() {
+    super("Coordinated action was cancelled.");
+    this.name = "AbortError";
+  }
+}
+
 /**
  * Coordinates independent collaborator actions without owning cursor rendering.
  * Actions can call CursorRenderer APIs and return their GSAP timelines for synchronization.
@@ -83,7 +90,10 @@ export class MultiCursorCoordinator {
       ).catch((error: unknown) => {
         // An explicit action cancellation is local. A genuine action failure
         // still aborts the group so dependent/sibling work cannot continue.
-        if (!(error instanceof Error && error.name === "AbortError") && !groupController.signal.aborted) {
+        // Only cancellation errors created by this coordinator are local.
+        // An application callback may independently reject with AbortError; that
+        // is still a genuine action failure and must propagate to the group.
+        if (!(error instanceof CoordinatorCancellationError) && !groupController.signal.aborted) {
           if (!hasFailure) { hasFailure = true; firstFailure = error; }
           this.cancelGroup(groupId);
         }
@@ -268,9 +278,7 @@ export class MultiCursorCoordinator {
   }
 
   private abortError(): Error {
-    const error = new Error("Coordinated action was cancelled.");
-    error.name = "AbortError";
-    return error;
+    return new CoordinatorCancellationError();
   }
 
   private assertActive(): void {
