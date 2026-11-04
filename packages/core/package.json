@@ -1,6 +1,7 @@
 {
   "name": "@cursorbuild/core",
   "version": "0.1.0",
+  "description": "Framework-independent TypeScript engine for animated multi-cursor website construction, resizing, scroll scenes, and visual effects.",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -21,5 +22,26 @@
   },
   "dependencies": {
     "gsap": "^3.12.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/suleiman2799-svg/cursorbuild.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/suleiman2799-svg/cursorbuild/tree/main/packages/core",
+  "bugs": {
+    "url": "https://github.com/suleiman2799-svg/cursorbuild/issues"
+  },
+  "keywords": [
+    "typescript",
+    "animation",
+    "cursor",
+    "website-construction",
+    "gsap",
+    "scrolltrigger",
+    "visual-effects"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

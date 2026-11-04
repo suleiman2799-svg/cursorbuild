@@ -1,1 +1,46 @@
-{"name":"@cursorbuild/react","version":"0.1.0","license":"MIT","type":"module","main":"./dist/index.js","types":"./dist/index.d.ts","exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},"files":["dist"],"scripts":{"build":"tsc -p tsconfig.json"},"dependencies":{"@cursorbuild/core":"0.1.0"},"peerDependencies":{"react":"^18.0.0 || ^19.0.0"}}
+{
+  "name": "@cursorbuild/react",
+  "version": "0.1.0",
+  "description": "Optional React provider and hooks for the CursorBuild website-construction animation engine.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@cursorbuild/core": "0.1.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/suleiman2799-svg/cursorbuild.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/suleiman2799-svg/cursorbuild/tree/main/packages/react",
+  "bugs": {
+    "url": "https://github.com/suleiman2799-svg/cursorbuild/issues"
+  },
+  "keywords": [
+    "react",
+    "typescript",
+    "cursor",
+    "animation",
+    "website-construction"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
