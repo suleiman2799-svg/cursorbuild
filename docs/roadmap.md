@@ -20,10 +20,10 @@ This roadmap distinguishes what is present on `main`, what has been implemented 
 - [x] Animated text insertion with caret feedback and target locking
 
 ## Step 6 — Cinematic animation engine
-- [x] Implemented on the existing PR #7 feature branch; not yet merged into main
+- [x] Implemented and merged into main
 
 ## Step 7 — Scroll-driven construction
-- [x] Implemented on the existing PR #9 feature branch; not yet merged into main
+- [x] Implemented and merged into main
 
 ## Step 8 — Multi-cursor coordination — implemented on main
 - [x] Independent cursor timelines and shared groups
@@ -39,7 +39,7 @@ This roadmap distinguishes what is present on `main`, what has been implemented 
 - [x] Pointer-transparent overlay and engine lifecycle cleanup
 
 ## Step 5B — Element resizing
-- [x] Implemented on the existing PR #6 feature branch; not yet merged into main
+- [x] Implemented and merged into main
 
 ## Step 10 — Responsive and performance optimisation — implemented on this branch
 - [x] Desktop, tablet, and mobile cursor visibility limits
