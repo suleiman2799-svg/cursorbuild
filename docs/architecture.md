@@ -36,15 +36,9 @@ CursorRenderer.click(id, options?) preserves the original one-argument API and a
 
 The press animation scales the existing SVG pointer down and back to its resting size. The ripple animates the existing halo element's scale and opacity. Both are composed on one GSAP timeline per cursor; separate cursors can animate simultaneously, while repeated clicks on the same cursor replace only that cursor's previous timeline. Completed timelines are removed from the renderer's active map. Removing a cursor, enabling reduced motion, or destroying the renderer kills active timelines and resets visual transforms.
 
-## Scroll-driven construction scenes
-
-ScrollConstructionEngine is exposed as engine.construction and owns independent ScrollConstructionScene instances. Each scene builds a paused GSAP timeline through a developer-supplied callback and creates a ScrollTrigger for a caller-selected section or selector. The trigger's normalized progress seeks the timeline directly, supporting sequential and simultaneous animation through normal GSAP timeline positioning. Scenes can be paused, resumed at the current trigger position, refreshed, and destroyed individually; engine destruction disposes every scene. Reverse playback is enabled by default and can be disabled per scene so progress only advances. Reduced-motion preference completes the scene immediately by default, and its media-query listener is removed when the scene is destroyed.
-
-The construction engine is independent of CursorRenderer. It does not create cursors or prescribe what elements a scene animates; developers may animate arbitrary DOM targets or compose their own cursor calls in GSAP callbacks. Multiple scenes maintain separate triggers and timelines.
-
 ## Extension approach
 
-Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport and real collaboration networking remain future modules. Scroll construction is managed by its own engine rather than being coupled to the cursor renderer.
+Keep DOM measurement and rendering at adapter boundaries, avoid global mutable state, and add deterministic tests for non-visual and DOM lifecycle logic. Presence transport, real collaboration networking, drag/drop, resizing, text insertion, and construction-scene authoring are future modules, not part of the current renderer.
 
 ## Drag-and-drop simulation
 
@@ -64,3 +58,29 @@ Supported targets are text-like input types (text, search, email, url, tel, pass
 A renderer-level target lock prevents simultaneous cursors from typing into the same element, and a cursor can own only one text insertion at a time. Text insertion cancels that cursor's prior drag/movement and visual click timeline; starting a drag or a new movement also cancels typing. stopTextInsertion() restores the original value or child nodes, kills the typing/focus timelines, releases the target lock, and removes the caret. Target removal is observed; cursor removal and renderer destruction perform the same cleanup. If reduced motion becomes active, the current insertion is completed immediately and its caret is removed.
 
 No synthetic keyboard, beforeinput, or input events are dispatched. Calling focus() can produce normal browser focus behaviour, but value changes are programmatic. Framework-controlled inputs (for example, React controlled inputs) may not update their component state; applications must update their own state separately or use uncontrolled elements. The simulation does not emulate physical keystrokes, IME composition, selection editing, or rich-text formatting.
+
+
+## Multi-cursor coordination
+
+`MultiCursorCoordinationEngine` is a framework-independent orchestration layer exposed as `engine.coordination`. It owns no DOM nodes, cursor renderer, GSAP timelines, scroll listeners, or framework state. A `CursorActionTimeline` is an immutable ordered or parallel track associated with one cursor ID. A `CoordinatedActionGroup` combines tracks into a dependency graph, allowing different cursors to work simultaneously while preserving each track's independent sequencing.
+
+Sequential tracks add an implicit dependency on the preceding action. Parallel tracks do not add implicit ordering. Explicit `dependsOn` edges can coordinate different cursors; group creation validates missing dependencies, duplicate IDs, self-dependencies, and cycles before any action runs. Group, track, and per-action delays are abort-aware milliseconds. Ready actions are launched concurrently and wait for their dependencies to complete successfully.
+
+Each action receives its group/action/cursor identifiers, an AbortSignal, and an abort-aware wait helper. Individual cancellation aborts only that action; dependent actions are cancelled rather than being allowed to run against incomplete prerequisites. Group cancellation and engine destruction propagate abort signals to active callbacks. A failed action cancels its siblings and rejects the group's run promise. Since JavaScript cannot forcibly stop arbitrary callback code, action implementations must cooperate with the supplied signal and return a promise that settles when their work ends.
+
+The action callback is the integration seam for movement, clicking, dragging, text insertion, resizing, cinematic animations, and scroll-driven scenes. For GSAP-backed operations, return or await the timeline so the dependency graph reflects actual animation completion. Void-returning visual effects can use the context wait helper when subsequent actions need to be delayed. No imports from React, CursorRenderer, CinematicAnimationEngine, or ScrollConstructionEngine are required, so these systems remain independently usable and can evolve on separate feature branches.
+
+
+## Advanced visual effects
+
+VisualEffectsManager is an optional DOM adapter exposed by engine.mountVisualEffects(container, options). It owns one absolute-positioned overlay with pointer-events disabled and never adds layout-affecting styles to target elements. It is independent of CursorRenderer and can be mounted alone or alongside cursor rendering.
+
+- highlight() and showSelectionBox() create geometry-aligned boxes and return handles with refresh() and destroy().
+- showGuides() and showSnapGuide() draw vertical/horizontal alignment indicators and return cleanup callbacks.
+- showMeasurement() draws a labelled distance line between container-relative points.
+- showGrid() draws an opt-in CSS grid; setBlueprintMode(true) snapshots element bounds into an overlay.
+- showCursorTrail() draws a pointer-transparent SVG polyline from supplied points.
+- setProgress() and complete() update a visual progress bar.
+- clear() removes active effects while preserving the manager; destroy() removes the overlay and restores the container's original inline position.
+
+All effects are opt-in. Target geometry and blueprint bounds are snapshots; call handle.refresh() after layout changes or recreate blueprint mode. Effects are decorative: guide visuals do not implement snapping, selection does not change application state, and no synthetic pointer or keyboard events are emitted. Reduced-motion preference removes the progress-width transition. CursorBuildEngine tracks effect managers and disposes them on destroy().

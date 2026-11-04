@@ -1,197 +1,315 @@
 # CursorBuild
 
-**CursorBuild** is an open-source, modular foundation for scroll-driven, multi-cursor website construction animations.
+**CursorBuild** is an open-source, modular TypeScript toolkit for building visual website-construction scenes with multiple collaborator cursors. Its framework-independent core provides cursor rendering and animation, interaction simulations, multi-cursor orchestration, and optional visual-effect overlays.
 
-> **Status: early development (v0.3.0).** The foundation, multiple-cursor rendering, natural movement, configurable visual click feedback, and drag/drop simulation are implemented. Text insertion simulation is now implemented; element resizing and full cinematic construction sequences remain planned.
+> **Project status: active development.** The foundation, cursor rendering and motion, drag/drop simulation, text insertion simulation, Step 8 multi-cursor coordination, and Step 9 advanced visual effects are implemented on the current development branch. Responsive/performance optimisation, resizing, reusable presets, broader examples, and release readiness remain future work. The npm packages are workspace packages in this repository; this README does not imply that they have been published to npm.
+
+## Implemented functionality
+
+- **Cursor rendering:** multiple named, coloured DOM cursors with container-relative coordinates, responsive visibility limits, and reduced-motion support.
+- **Movement and click feedback:** direct movement, curved natural paths and sequences, plus configurable press and ripple feedback.
+- **Interaction simulations:** visual drag/drop with per-element locking, and progressive text insertion into supported inputs, textareas, and contenteditable targets.
+- **Step 8 — Multi-cursor coordination:** independent cursor timelines, sequential or parallel actions, cross-cursor dependencies, group/timeline/action delays, individual and group cancellation, abort signals, and engine lifecycle cleanup.
+- **Step 9 — Advanced visual effects:** optional highlights, selection boxes, alignment and snap guides, measurement lines, grid overlays, blueprint snapshots, SVG cursor trails, and construction progress/completion feedback.
+- **Framework integration:** optional React provider and hooks; React is not a dependency of the core runtime.
+
+These features are visual simulations. CursorBuild does not dispatch synthetic mouse, pointer, keyboard, beforeinput, or input events. Dragging does not implement native browser drag-and-drop, guide indicators do not perform snapping, and visual selection does not mutate application state.
 
 ## Technology stack
-- **TypeScript** — framework-agnostic core
-- **GSAP + ScrollTrigger** — animation timelines and scroll orchestration
+
+- **TypeScript** — framework-independent core
+- **GSAP** — cursor and interaction animation timelines
+- **ScrollTrigger** — scroll resource management
 - **React** — optional provider and hooks
 - **Vite** — demo application
-- **Vitest** — unit tests
+- **Vitest + jsdom** — automated tests
 - **npm workspaces** — monorepo management
 
 ## Repository structure
+
 ~~~text
 apps/demo/                 Vite demonstration application
-packages/core/             Framework-agnostic engine
-  src/animation/            GSAP timeline manager
-  src/cursor/               Cursor registry, renderer, and tests
+packages/core/             Framework-independent engine and DOM adapters
+  src/animation/            GSAP animation manager
+  src/coordination/         Multi-cursor coordination engine
+  src/cursor/               Cursor registry, renderer, movement and interactions
   src/scroll/               ScrollTrigger manager
-  src/sequence/             Action sequencing
-packages/react/             React provider and hooks
-docs/                       Architecture and roadmap
+  src/sequence/             Sequential action runner
+  src/visual-effects/       Optional visual effects manager
+packages/react/             Optional React provider and hooks
+docs/                       Architecture and development roadmap
+.github/workflows/           CI workflow
 ~~~
 
-## Multiple cursor rendering
+## Installation
 
-The core can render collaborator cursors without React. Import the stylesheet, register identities, and mount a renderer on the element that defines the coordinate space:
+Requires **Node.js 20 or newer** and npm.
+
+Clone the repository and install its workspace dependencies:
+
+~~~bash
+git clone https://github.com/suleiman2799-svg/cursorbuild.git
+cd cursorbuild
+npm install
+~~~
+
+The core and React packages are currently consumed as local npm workspaces. For a working example, start the demo:
+
+~~~bash
+npm run dev
+~~~
+
+This command builds the core and React workspaces, then starts the Vite demo. The root development server is intended for the repository demo, not a published-package install.
+
+## Core usage
+
+Import the core engine and its cursor stylesheet in a browser application:
 
 ~~~ts
 import { CursorBuildEngine } from "@cursorbuild/core";
 import "@cursorbuild/core/cursor-renderer.css";
 
 const engine = new CursorBuildEngine();
-engine.cursors.add({ id: "designer", name: "Maya · Design", color: "#a78bfa" });
-const renderer = engine.mountCursors(document.querySelector<HTMLElement>("#canvas")!);
+
+engine.cursors.add({
+  id: "designer",
+  name: "Maya · Design",
+  color: "#a78bfa"
+});
+
+const canvas = document.querySelector<HTMLElement>("#canvas")!;
+const renderer = engine.mountCursors(canvas);
+
 renderer.moveTo("designer", { x: 180, y: 120 });
-renderer.click("designer"); // visual feedback only; never dispatches a DOM click
-// engine.destroy() disposes renderers and GSAP resources.
+renderer.moveNaturally("designer", { x: 420, y: 180 }, {
+  duration: 1.1,
+  ease: "power3.inOut",
+  curvature: 0.2
+});
+
+// Dispose engine-owned renderers and resources when the scene is finished.
+engine.destroy();
 ~~~
 
-Coordinates are CSS pixels relative to the mounted container. The overlay and cursor elements use pointer-events: none and never capture input. Visible cursor count is capped by viewport width (desktop 8, tablet 3, mobile 2 by default).
+Coordinates are CSS pixels relative to the mounted container. Cursor overlays are pointer-transparent. The default visible cursor limits are 8 on desktop, 3 at widths up to 900px, and 2 at widths up to 600px. These limits and reduced-motion behaviour can be configured through `mountCursors(container, options)`.
 
-## Natural cursor movement
+### Movement and click feedback
 
-The renderer exposes natural movement without changing the existing `moveTo()` API. Each cursor gets its own GSAP timeline.
+Each cursor has its own movement and click timelines. Natural movement supports curved paths, configurable duration/easing, and sequences with pauses:
 
 ~~~ts
-renderer.moveNaturally("designer", { x: 420, y: 180 }, {
-  duration: 1.1, ease: "power3.inOut", curvature: 0.2
-});
 renderer.moveSequence("designer", [
   { to: { x: 180, y: 120 }, duration: 0.8 },
   { to: { x: 360, y: 240 }, pauseAfter: 0.35 },
   { to: { x: 520, y: 100 } }
 ], { pauseBetween: [0.15, 0.45] });
-renderer.stopNaturalMovement("designer");
-~~~
 
-Curvature ranges from 0 (straight) to 1 (strong arc). Pauses accept seconds or a [minimum, maximum] range. Coordinates remain container-relative CSS pixels.
-
-## Configurable click feedback
-
-`click()` remains backward compatible: `renderer.click("designer")` plays the default press-and-release plus ripple animation. Configure renderer-wide defaults or override them for an individual click:
-
-~~~ts
-const renderer = engine.mountCursors(canvas, {
-  clickFeedback: {
-    duration: 0.36,       // total animation time, seconds
-    rippleSize: 2.2,      // final scale multiplier
-    intensity: 0.75,      // ripple opacity, 0–1
-    style: "ripple-press" // "ripple" | "press" | "ripple-press"
-  }
+renderer.click("designer", {
+  style: "ripple-press", // "ripple" | "press" | "ripple-press"
+  duration: 0.36,
+  rippleSize: 2.2,
+  intensity: 0.75
 });
-
-renderer.click("designer");
-renderer.click("designer", { style: "ripple", rippleSize: 2.8 });
-renderer.click("designer-2", { style: "press", duration: 0.24 });
 ~~~
 
-Defaults are 0.32 seconds, ripple scale 2.15, intensity 0.72, and combined press/ripple style. A press compresses and releases the SVG pointer; a ripple animates the existing halo node, so no temporary DOM elements are created. Each cursor owns an independent click timeline. A new click replaces only that same cursor's active click animation. Click feedback is visual only and never triggers page interaction.
+The click API remains visual-only. Reduced-motion preferences are respected by default.
 
-When `prefers-reduced-motion: reduce` is active and `respectReducedMotion` is enabled (the default), click animations are suppressed and movement snaps to its destination. Set `respectReducedMotion: false` only when your application has an explicit alternative accessibility strategy.
+### Drag/drop and text insertion
 
-## Getting started
-
-Requires Node.js 20+ and npm.
-
-~~~bash
-npm install
-npm run dev
-~~~
-
-## Continuous integration
-
-GitHub Actions runs unit tests, TypeScript checks, and the production build on pushes to development branches and pull requests targeting main.
-
-## Development commands
-~~~bash
-npm run build
-npm test
-npm run test:watch
-npm run typecheck
-~~~
-
-## Roadmap
-1. **Foundation:** engine lifecycle, configuration, cursor registry, GSAP/ScrollTrigger managers, action sequencing, React integration, demo, and tests.
-2. **Cursor rendering and motion (current):** multiple DOM cursors, direct and curved movement, configurable easing/duration, click press/ripple feedback, responsive visibility, and reduced-motion support.
-3. **Interaction primitives:** drag/drop, resizing, positioning, and animated text insertion.
-4. **Orchestration:** declarative timelines, multi-cursor coordination, responsive scenes, and reduced-motion behaviour.
-5. **Production readiness:** browser integration tests, accessibility/performance validation, API documentation, and release automation.
-
-See docs/architecture.md and docs/roadmap.md for implementation boundaries and future work.
-
-## Contributing
-
-Issues and pull requests are welcome. Keep the core framework-independent and add tests for new behaviour.
-
-## License
-
-MIT — see LICENSE.
-
-## Drag-and-drop simulation
-
-`drag()` makes a cursor approach an element, visually grab it, and animate it to a new container-relative position. Targets can be CSS selectors or `HTMLElement` references contained by the mounted container:
+Drag a contained element to a new container-relative top-left position:
 
 ~~~ts
 renderer.drag("designer", {
-  target: "#design-card",
+  target: "#design-card", // selector or contained HTMLElement
   to: { x: 420, y: 260 },
-  duration: 1.2,
-  curvature: 0.18,
-  grabScale: 0.82
+  duration: 1.2
 });
 
-renderer.isDragging("designer"); // true while the operation is active
-renderer.stopDrag("designer");   // cancel and restore the original inline translate
+renderer.isDragging("designer");
+renderer.stopDrag("designer"); // cancel and restore the original inline translate
 ~~~
 
-`duration` defaults to 1.2 seconds; `curvature` defaults to 0.16 (0–1), and `grabScale` defaults to 0.82 (greater than 0 and at most 1). The destination is the element's top-left position relative to the mounted container's content origin. The renderer animates the CSS individual `translate` property, preserving the element's existing `transform`; successful drops retain the new position. Cancellation restores the original inline `translate` value.
-
-Different cursors can drag different elements concurrently. An element is locked to one cursor until release or cancellation. Removed targets, cursor removal, and renderer destruction cancel the operation and release its lock. Reduced-motion mode skips the animation and places the element at its destination immediately. Dragging is a visual simulation only: CursorBuild does not dispatch browser mouse or pointer events, and it does not make arbitrary elements natively draggable.
-## Text insertion simulation
-
-The typeText() API moves a cursor naturally to a supported text target, focuses it with visual press feedback, then reveals text progressively beside a blinking caret:
+Insert text progressively into a supported target:
 
 ~~~ts
 renderer.typeText("designer", {
-  target: "#hero-heading", // CSS selector or HTMLElement
+  target: "#hero-heading",
   text: "Welcome to CursorBuild",
-  duration: 2.5,            // typing phase, seconds
-  initialDelay: 0.2,        // pause before the first character
-  mode: "replace"           // "replace" | "append"
+  duration: 2.5,
+  initialDelay: 0.2,
+  mode: "replace" // "replace" | "append"
 });
 
-renderer.isTyping("designer");          // true while active
+renderer.isTyping("designer");
 renderer.stopTextInsertion("designer"); // cancel and restore original content
 ~~~
 
-Use characterIntervalMs instead of duration to specify a per-character interval in milliseconds. Duration defaults to 1.8 seconds, initialDelay to 0.12 seconds, and mode to replace. Targets must be contained by the mounted container and must be a text-like input (text, search, email, URL, telephone, or password), textarea, or [contenteditable="true"] element. Contenteditable insertion is plain text; replace mode temporarily detaches existing child nodes and restores them if cancelled.
+Text targets are text-like inputs (text, search, email, URL, telephone, or password), textareas, and elements with `contenteditable="true"`. Use `characterIntervalMs` instead of `duration` to set a per-character interval. Programmatic value changes do not emit input events; controlled framework inputs may therefore need a separate application-state update. Drag and text simulations do not dispatch browser input events.
 
-Typing is a visual DOM simulation. CursorBuild focuses the target and updates its value/text progressively, but does not dispatch keyboard, beforeinput, or input events. **Controlled React/Vue/etc. inputs may not synchronize their framework state** with these programmatic value changes; use an application callback/state update or an uncontrolled input for framework-managed forms. Cancellation restores the original value/content and removes the temporary caret. Removed targets, cursor removal, renderer destruction, and reduced-motion preferences are handled automatically. The caret and cursor use the existing overlay; no new dependency is required.
+## Step 8 — Multi-cursor coordination
 
-## Scroll-driven construction scenes
-
-Use the engine's construction API to bind an independent GSAP timeline to a page section. The core remains framework-independent, and scenes can be used without mounting cursor overlays:
+The coordination engine is available as `engine.coordination`. It is independent of cursor rendering and accepts caller-provided asynchronous actions, so it can orchestrate any compatible animation or application operation.
 
 ~~~ts
-const engine = new CursorBuildEngine();
+const coordinator = engine.coordination;
 
-const heroScene = engine.construction.createScene(
-  "hero",
+const designer = coordinator.createTimeline("maya", [
   {
-    trigger: "#hero",
-    start: "top 80%",
-    end: "bottom 20%",
-    reverse: true,
-    onProgress: (progress) => console.log("Hero construction:", progress)
+    id: "move-to-card",
+    run: async ({ signal }) => {
+      const animation = renderer.moveNaturally("maya", { x: 280, y: 180 });
+      if (animation) await animation;
+      if (signal.aborted) return;
+    }
   },
-  (timeline) => {
-    timeline.from("#hero h1", { y: 36, opacity: 0, duration: 0.7 });
-    timeline.from("#hero p", { y: 20, opacity: 0, duration: 0.45 }, "<0.15");
-    timeline.from("#hero img", { scale: 0.92, opacity: 0, duration: 0.8 }, 0);
+  {
+    id: "type-heading",
+    run: async () => {
+      const animation = renderer.typeText("maya", {
+        target: "#card-title",
+        text: "A shared idea",
+        duration: 1.1
+      });
+      if (animation) await animation;
+    }
   }
-);
+]); // sequential by default
 
-// Scene controls:
-heroScene.pause();
-heroScene.resume();
-heroScene.refresh();
-heroScene.destroy();
+const reviewer = coordinator.createTimeline("noah", [
+  {
+    id: "review-card",
+    dependsOn: ["type-heading"],
+    run: async () => {
+      const animation = renderer.drag("noah", {
+        target: "#review-card",
+        to: { x: 420, y: 180 }
+      });
+      if (animation) await animation;
+    }
+  }
+], { delay: 180 });
 
-// Or let engine.destroy() clean up every scene.
+const group = coordinator.createGroup("hero-construction", [designer, reviewer]);
+await group.run();
+
+// Cancel one action or the whole group:
+group.cancelAction("review-card");
+coordinator.cancelGroup("hero-construction");
 ~~~
 
-Each scene has its own ScrollTrigger and paused GSAP timeline. Scroll progress seeks the timeline from 0 to 1; reverse: false keeps progress from decreasing when the visitor scrolls backwards. Reduced-motion preference completes the scene immediately by default; set respectReducedMotion: false only when your application provides an appropriate alternative. Use GSAP timeline positions to compose sequential and simultaneous work. start and end accept ScrollTrigger expressions, and onProgress receives normalized progress. Call engine.construction.refresh() after application layout changes that affect trigger measurements. Destroy individual scenes with destroyScene(id) or dispose all scenes through engine.destroy().
+Cursor timelines run sequentially by default; pass `{ mode: "parallel" }` to allow independent actions on the same cursor to start together. Different cursor timelines can run concurrently. Explicit `dependsOn` action IDs coordinate work across cursors. Group, timeline, and action delays are measured in milliseconds.
+
+An action receives `groupId`, `actionId`, `cursorId`, an `AbortSignal`, and an abort-aware `wait(milliseconds)` helper. Return or await an animation promise when later actions must wait for it to finish. Cancellation is cooperative: callbacks should observe the signal and settle promptly. A failed action cancels its siblings and causes the group's run promise to reject. Destroying the engine cancels its coordination groups.
+
+## Step 9 — Advanced visual effects
+
+Mount the optional effects layer independently of cursor rendering:
+
+~~~ts
+const effects = engine.mountVisualEffects(canvas, { gridSize: 24 });
+
+const selection = effects.showSelectionBox("#hero-card", "Hero card");
+const highlight = effects.highlight("#hero-title", {
+  color: "#8b5cf6",
+  opacity: 0.12
+});
+
+const removeGuides = effects.showGuides([
+  { axis: "vertical", position: 320, label: "Center" },
+  { axis: "horizontal", position: 180 }
+]);
+const removeSnapGuide = effects.showSnapGuide("vertical", 320, "Snapped");
+
+const grid = effects.showGrid({ size: 24, opacity: 0.2 });
+const blueprint = effects.setBlueprintMode(true);
+effects.showMeasurement({ x: 20, y: 20 }, { x: 180, y: 100 }, "183px");
+effects.showCursorTrail([
+  { x: 12, y: 20 },
+  { x: 70, y: 42 },
+  { x: 140, y: 90 }
+]);
+effects.setProgress(0.65);
+effects.complete();
+
+// Handles and transient-effect callbacks can be cleaned up individually.
+selection.destroy();
+highlight.destroy();
+removeGuides();
+removeSnapGuide();
+grid.destroy();
+blueprint?.destroy();
+
+// clear() removes all effects but leaves this manager reusable.
+effects.clear();
+effects.destroy();
+~~~
+
+Highlights and selection boxes return handles with `refresh()` and `destroy()`. Guides return cleanup callbacks; measurements and cursor trails return their created DOM elements. Grid and blueprint effects return handles. All coordinates use container-relative CSS pixels. Target geometry and blueprint bounds are snapshots: refresh handles or recreate blueprint mode after layout changes. `clear()` removes all active effects, including transient guides, measurements, and trails, while retaining the manager; `destroy()` also removes the overlay and restores the container's original inline positioning when the manager changed it. `engine.destroy()` disposes mounted effect managers automatically.
+
+Effects are decorative and opt-in. They do not implement snapping, change application selection/state, intercept pointer input, or dispatch DOM events. Reduced-motion preference disables the progress-width transition by default.
+
+## Optional React integration
+
+The React workspace exports `CursorBuildProvider`, `useCursorBuild()`, and `useCursors()`:
+
+~~~tsx
+import { CursorBuildProvider, useCursorBuild, useCursors } from "@cursorbuild/react";
+
+function CursorStatus() {
+  const engine = useCursorBuild();
+  const cursors = useCursors();
+  return <p>{cursors.length} collaborators</p>;
+}
+
+function App() {
+  return (
+    <CursorBuildProvider>
+      <CursorStatus />
+    </CursorBuildProvider>
+  );
+}
+~~~
+
+The provider creates and disposes the engine. The core package itself does not depend on React.
+
+## Development commands
+
+Run these commands from the repository root:
+
+| Command | Purpose |
+| --- | --- |
+| `npm install` | Install all workspace dependencies |
+| `npm run dev` | Build core and React, then start the Vite demo |
+| `npm test` | Run the Vitest suite once |
+| `npm run test:watch` | Run Vitest in watch mode |
+| `npm run typecheck` | Build core and React, then type-check core, React, and demo |
+| `npm run build` | Build all workspaces that define a build script |
+
+GitHub Actions runs tests, type checks, and builds for pushes to development branches and pull requests targeting `main`.
+
+## Current roadmap
+
+| Area | Status |
+| --- | --- |
+| Foundation, engine lifecycle, configuration, cursor registry, animation/scroll managers, action sequencing, React integration, demo and baseline tests | Complete |
+| Cursor rendering, natural movement, click feedback, responsive visibility and reduced-motion handling | Implemented |
+| Drag/drop and text insertion simulations | Implemented |
+| Step 8 — multi-cursor coordination engine | Implemented |
+| Step 9 — advanced visual effects | Implemented |
+| Element resizing and positioning | Planned |
+| Step 10 — responsive and performance optimisation | Planned |
+| Step 11 — reusable component and preset library | Planned |
+| Step 12 — complete documentation and developer experience | Planned |
+| Step 13 — demo website and playground | Planned |
+| Step 14 — examples and integration | Planned |
+| Step 15 — package and release readiness | Planned |
+
+See [docs/architecture.md](docs/architecture.md) for module boundaries and [docs/roadmap.md](docs/roadmap.md) for the milestone checklist. Items marked planned are not represented as completed functionality.
+
+## Contributing
+
+Issues and pull requests are welcome. Keep the core framework-independent, preserve the visual-simulation boundaries, and add tests for new behaviour.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
