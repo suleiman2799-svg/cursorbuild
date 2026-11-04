@@ -1,26 +1,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
-  const timeline = {
-    progress: vi.fn(),
-    pause: vi.fn(),
-    resume: vi.fn(),
-    kill: vi.fn(),
-    to: vi.fn()
-  };
+  const timelines: Array<{
+    progress: ReturnType<typeof vi.fn>;
+    pause: ReturnType<typeof vi.fn>;
+    resume: ReturnType<typeof vi.fn>;
+    kill: ReturnType<typeof vi.fn>;
+    to: ReturnType<typeof vi.fn>;
+  }> = [];
+  const createTimeline = vi.fn(() => {
+    const timeline = {
+      progress: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      kill: vi.fn(),
+      to: vi.fn()
+    };
+    timelines.push(timeline);
+    return timeline;
+  });
   const triggers: Array<{ progress: number; kill: ReturnType<typeof vi.fn>; refresh: ReturnType<typeof vi.fn> }> = [];
   const create = vi.fn((_vars: unknown) => {
     const trigger = { progress: 0, kill: vi.fn(), refresh: vi.fn() };
     triggers.push(trigger);
     return trigger;
   });
-  return { timeline, triggers, create, registerPlugin: vi.fn() };
+  return { timelines, createTimeline, triggers, create, registerPlugin: vi.fn() };
 });
 
 vi.mock("gsap", () => ({
   gsap: {
     registerPlugin: mocks.registerPlugin,
-    timeline: vi.fn(() => mocks.timeline)
+    timeline: vi.fn(() => mocks.createTimeline())
   }
 }));
 vi.mock("gsap/ScrollTrigger", () => ({
@@ -40,6 +51,7 @@ describe("ScrollConstructionEngine", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.triggers.length = 0;
+    mocks.timelines.length = 0;
     mocks.create.mockImplementation((_vars: unknown) => {
       const trigger = { progress: 0, kill: vi.fn(), refresh: vi.fn() };
       mocks.triggers.push(trigger);
@@ -56,7 +68,7 @@ describe("ScrollConstructionEngine", () => {
 
     expect(mocks.registerPlugin).toHaveBeenCalled();
     expect(scene.progress).toBe(0);
-    expect(mocks.timeline.progress).toHaveBeenCalledWith(0);
+    expect(mocks.timelines[0]!.progress).toHaveBeenCalledWith(0);
     expect(mocks.create).toHaveBeenCalledWith(expect.objectContaining({
       trigger: "#hero", start: "top 80%", end: "bottom 20%"
     }));
@@ -64,7 +76,7 @@ describe("ScrollConstructionEngine", () => {
     const vars = mocks.create.mock.calls[0]?.[0] as unknown as { onUpdate: (self: { progress: number }) => void };
     vars.onUpdate({ progress: 0.65 });
     expect(scene.progress).toBe(0.65);
-    expect(mocks.timeline.progress).toHaveBeenLastCalledWith(0.65);
+    expect(mocks.timelines[0]!.progress).toHaveBeenLastCalledWith(0.65);
     expect(onProgress).toHaveBeenCalledWith(0.65);
   });
 
@@ -74,7 +86,7 @@ describe("ScrollConstructionEngine", () => {
     const vars = mocks.create.mock.calls[0]?.[0] as unknown as { onUpdate: (self: { progress: number }) => void };
     vars.onUpdate({ progress: 0.7 });
     vars.onUpdate({ progress: 0.2 });
-    expect(mocks.timeline.progress).toHaveBeenLastCalledWith(0.7);
+    expect(mocks.timelines[0]!.progress).toHaveBeenLastCalledWith(0.7);
   });
 
   it("completes scenes for reduced motion and removes the preference listener", () => {
@@ -108,7 +120,39 @@ describe("ScrollConstructionEngine", () => {
     scene.resume();
     expect(scene.isPaused).toBe(false);
     expect(scene.progress).toBe(0.8);
-    expect(mocks.timeline.resume).not.toHaveBeenCalled();
+    expect(mocks.timelines[0]!.resume).not.toHaveBeenCalled();
+  });
+
+  it("keeps multiple scenes on independent timelines and progress streams", () => {
+    const engine = new ScrollConstructionEngine();
+    const firstProgress = vi.fn();
+    const secondProgress = vi.fn();
+    const first = engine.createScene("first", { trigger: "#first", onProgress: firstProgress }, () => {});
+    const second = engine.createScene("second", { trigger: "#second", onProgress: secondProgress }, () => {});
+    expect(mocks.timelines).toHaveLength(2);
+
+    const firstVars = mocks.create.mock.calls[0]?.[0] as unknown as { onUpdate: (self: { progress: number }) => void };
+    const secondVars = mocks.create.mock.calls[1]?.[0] as unknown as { onUpdate: (self: { progress: number }) => void };
+    firstVars.onUpdate({ progress: 0.25 });
+    secondVars.onUpdate({ progress: 0.75 });
+
+    expect(first.progress).toBe(0.25);
+    expect(second.progress).toBe(0.75);
+    expect(mocks.timelines[0]!.progress).toHaveBeenLastCalledWith(0.25);
+    expect(mocks.timelines[1]!.progress).toHaveBeenLastCalledWith(0.75);
+    expect(firstProgress).toHaveBeenCalledWith(0.25);
+    expect(secondProgress).toHaveBeenCalledWith(0.75);
+
+    engine.destroyScene("first");
+    expect(mocks.timelines[0]!.kill).toHaveBeenCalledOnce();
+    expect(mocks.timelines[1]!.kill).not.toHaveBeenCalled();
+    expect(mocks.triggers[0]!.kill).toHaveBeenCalledOnce();
+    expect(mocks.triggers[1]!.kill).not.toHaveBeenCalled();
+
+    secondVars.onUpdate({ progress: 0.9 });
+    expect(second.progress).toBe(0.9);
+    expect(mocks.timelines[1]!.progress).toHaveBeenLastCalledWith(0.9);
+    expect(engine.getScene("second")).toBe(second);
   });
 
   it("destroys individual scenes and releases their trigger and timeline", () => {
@@ -117,7 +161,7 @@ describe("ScrollConstructionEngine", () => {
     engine.destroyScene("intro");
     expect(engine.getScene("intro")).toBeUndefined();
     expect(mocks.triggers[0]!.kill).toHaveBeenCalled();
-    expect(mocks.timeline.kill).toHaveBeenCalled();
+    expect(mocks.timelines[0]!.kill).toHaveBeenCalled();
     scene.destroy();
   });
 
@@ -128,7 +172,7 @@ describe("ScrollConstructionEngine", () => {
     engine.createScene("hero", { trigger: "#hero" }, () => {});
     expect(() => engine.createScene("hero", { trigger: "#other" }, () => {})).toThrow(/already exists/);
     expect(() => engine.createScene("broken", { trigger: "#broken" }, () => { throw new Error("builder failed"); })).toThrow("builder failed");
-    expect(mocks.timeline.kill).toHaveBeenCalled();
+    expect(mocks.timelines[0]!.kill).toHaveBeenCalled();
   });
 
   it("destroys every scene and rejects new scenes after engine destruction", () => {
