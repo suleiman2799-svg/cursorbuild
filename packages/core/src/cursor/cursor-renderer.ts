@@ -579,12 +579,12 @@ export class CursorRenderer {
     const transformMatrix = (() => {
       const value = computed.transform;
       if (!value || value === "none") return [1, 0, 0, 1] as const;
-      const match2d = value.match(/^matrix\\(([^)]+)\\)$/);
+      const match2d = value.match(/^matrix\(([^)]+)\\)$/);
       if (match2d) {
         const values = match2d[1]!.split(",").map(Number);
         if (values.length === 6 && values.every(Number.isFinite)) return [values[0]!, values[1]!, values[2]!, values[3]!] as const;
       }
-      const match3d = value.match(/^matrix3d\\(([^)]+)\\)$/);
+      const match3d = value.match(/^matrix3d\(([^)]+)\\)$/);
       if (match3d) {
         const values = match3d[1]!.split(",").map(Number);
         if (values.length === 16 && values.every(Number.isFinite)) return [values[0]!, values[1]!, values[4]!, values[5]!] as const;
