@@ -12,6 +12,7 @@ type TimelineMock = {
   eventCallback: ReturnType<typeof vi.fn>;
   kill: ReturnType<typeof vi.fn>;
   reverse: ReturnType<typeof vi.fn>;
+  callbacks: Map<string, ((...args: unknown[]) => void) | null>;
 };
 const timelines = gsapState.timelines as TimelineMock[];
 
@@ -19,12 +20,21 @@ vi.mock("gsap", () => ({
   gsap: {
     set: gsapState.set,
     timeline: vi.fn(() => {
+      const callbacks = new Map<string, ((...args: unknown[]) => void) | null>();
       const timeline = {
         fromTo: vi.fn().mockReturnThis(),
         to: vi.fn().mockReturnThis(),
-        eventCallback: vi.fn().mockReturnThis(),
-        kill: vi.fn(),
-        reverse: vi.fn().mockReturnThis()
+        eventCallback: vi.fn(function (this: TimelineMock, event: string, callback?: ((...args: unknown[]) => void) | null) {
+          if (arguments.length === 1) return callbacks.get(event) ?? null;
+          callbacks.set(event, callback ?? null);
+          return this;
+        }),
+        kill: vi.fn(function (this: TimelineMock) {
+          callbacks.get("onInterrupt")?.call(this);
+          return this;
+        }),
+        reverse: vi.fn().mockReturnThis(),
+        callbacks
       };
       gsapState.timelines.push(timeline);
       return timeline;
@@ -151,6 +161,27 @@ describe("CinematicAnimationEngine", () => {
     expect(timelines[0].kill).toHaveBeenCalledOnce();
     engine.destroy();
     expect(remove).toHaveBeenCalledWith("change", expect.any(Function));
+    window.matchMedia = original;
+  });
+
+  it("untracks externally killed timelines and skips their final state on reduced-motion changes", () => {
+    let listener: ((event: MediaQueryListEvent) => void) | undefined;
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: (_: string, callback: (event: MediaQueryListEvent) => void) => { listener = callback; },
+      removeEventListener: vi.fn()
+    }) as unknown as typeof window.matchMedia;
+    const { engine, first } = setup();
+    const timeline = engine.revealText(first)!;
+
+    timeline.kill();
+    expect(timelines[0].kill).toHaveBeenCalledOnce();
+    engine.kill(timeline);
+    expect(timelines[0].kill).toHaveBeenCalledOnce();
+
+    listener?.({ matches: true } as MediaQueryListEvent);
+    expect(gsapState.set).not.toHaveBeenCalled();
     window.matchMedia = original;
   });
 
