@@ -45,6 +45,7 @@ This roadmap distinguishes what is present on `main`, what has been implemented 
 - [x] Desktop, tablet, and mobile cursor visibility limits
 - [x] Additional coarse-pointer/touch visibility cap
 - [x] Visibility updates on window resize, orientation changes, visual viewport resize, and pointer media-query changes
+- [x] Coalesced viewport updates with requestAnimationFrame and pending-frame cancellation on destroy
 - [x] Adaptive visual-effects profiles: auto, quality, balanced, and performance
 - [x] Configurable SVG trail-point and blueprint-element limits
 - [x] Reduced-motion and performance-mode transition suppression
