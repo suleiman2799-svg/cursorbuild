@@ -217,3 +217,30 @@ coordinator.cancelGroup("hero-construction");
 Cursor timelines run sequentially by default; set `mode: "parallel"` to run independent actions on the same cursor concurrently. Separate cursor timelines start together unless a timeline delay or action dependency says otherwise. Dependencies may refer to actions on another cursor. Group, timeline, and action delays are milliseconds. An action should return a promise that settles when its work is complete; GSAP timelines can be awaited. For fire-and-forget APIs such as visual click feedback, use the action context's abort-aware `wait(milliseconds)` when later work must wait for the effect.
 
 The coordinator invokes caller-provided callbacks and passes the cursor ID, action ID, group ID, and an `AbortSignal`. It does not synthesize DOM events, own cursor rendering, or assume that a cursor API exists. This adapter boundary lets actions call movement, click, drag, typing, resizing, cinematic animation, or scroll-scene controls while keeping those modules independently usable. Cancellation is cooperative: callbacks should observe the signal and settle promptly when aborted. Destroying the engine cancels every coordination group.
+
+
+## Advanced visual effects
+
+Mount optional design overlays independently of cursor rendering. Only the effects needed by a scene are created; the overlay is pointer-transparent and does not change target layout.
+
+~~~ts
+const effects = engine.mountVisualEffects(document.querySelector("#canvas")!, { gridSize: 24 });
+const selection = effects.showSelectionBox("#hero-card", "Hero card");
+const highlight = effects.highlight("#hero-title", { color: "#8b5cf6", opacity: 0.12 });
+const removeGuides = effects.showGuides([
+  { axis: "vertical", position: 320, label: "Center" },
+  { axis: "horizontal", position: 180 }
+]);
+const removeSnap = effects.showSnapGuide("vertical", 320, "Snapped");
+const grid = effects.showGrid({ size: 24, opacity: 0.2 });
+const blueprint = effects.setBlueprintMode(true);
+effects.showMeasurement({ x: 20, y: 20 }, { x: 180, y: 100 }, "183px");
+effects.showCursorTrail([{ x: 12, y: 20 }, { x: 70, y: 42 }, { x: 140, y: 90 }]);
+effects.setProgress(0.65);
+effects.complete();
+
+selection.destroy(); highlight.destroy(); removeGuides(); removeSnap(); grid.destroy();
+blueprint?.destroy(); effects.clear(); effects.destroy();
+~~~
+
+Targets are selectors scoped to the mounted container or contained HTMLElement references. Selection/highlight handles expose refresh() and destroy(); refresh after application layout changes. Guide, measurement, grid, and trail coordinates use container-relative CSS pixels. Blueprint mode snapshots current element bounds and should be recreated after major layout changes. Effects are decorative only: guides do not implement snapping, selection does not change application state, and no DOM input events are dispatched. The overlay cannot intercept page interaction. engine.destroy() disposes mounted effects automatically. Reduced-motion preference disables the progress transition.
