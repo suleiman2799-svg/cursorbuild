@@ -88,10 +88,9 @@ export class MultiCursorCoordinator {
     }
 
     try {
-      await Promise.all(tasks.values());
-    } catch (error) {
-      this.cancelGroup(groupId);
-      throw error;
+      const settled = await Promise.allSettled(tasks.values());
+      const rejected = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
+      if (rejected) throw rejected.reason;
     } finally {
       this.groups.delete(groupId);
     }
