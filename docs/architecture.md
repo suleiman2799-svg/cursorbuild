@@ -60,12 +60,27 @@ A renderer-level target lock prevents simultaneous cursors from typing into the 
 No synthetic keyboard, beforeinput, or input events are dispatched. Calling focus() can produce normal browser focus behaviour, but value changes are programmatic. Framework-controlled inputs (for example, React controlled inputs) may not update their component state; applications must update their own state separately or use uncontrolled elements. The simulation does not emulate physical keystrokes, IME composition, selection editing, or rich-text formatting.
 
 
-## Element resizing simulation
+## Multi-cursor coordination
 
-CursorRenderer.resize(id, options) is implemented in the renderer alongside drag and text insertion. It resolves a selector only inside the mounted container or accepts a contained HTMLElement, validates positive finite dimensions, and computes CSS width/height values that correspond to the requested rendered box size (including the target's box-sizing, padding, and borders).
+`MultiCursorCoordinationEngine` is a framework-independent orchestration layer exposed as `engine.coordination`. It owns no DOM nodes, cursor renderer, GSAP timelines, scroll listeners, or framework state. A `CursorActionTimeline` is an immutable ordered or parallel track associated with one cursor ID. A `CoordinatedActionGroup` combines tracks into a dependency graph, allowing different cursors to work simultaneously while preserving each track's independent sequencing.
 
-A per-cursor GSAP timeline first moves the cursor along a cubic Bezier approach path to the selected handle, then interpolates width and height while keeping the cursor attached to that handle. Edge handles modify only their corresponding axis (top/bottom: height; left/right: width); corner handles modify both dimensions. A temporary selection frame and eight handle nodes are rendered in the existing pointer-transparent overlay. The target itself is not assigned transforms, positioning, outline, or box-shadow styles; existing transforms and positioning therefore remain unchanged. The frame is removed on release or cancellation.
+Sequential tracks add an implicit dependency on the preceding action. Parallel tracks do not add implicit ordering. Explicit `dependsOn` edges can coordinate different cursors; group creation validates missing dependencies, duplicate IDs, self-dependencies, and cycles before any action runs. Group, track, and per-action delays are abort-aware milliseconds. Ready actions are launched concurrently and wait for their dependencies to complete successfully.
 
-The renderer maintains a target lock and one active resize per cursor. Different cursors may resize different targets simultaneously. Resize conflicts with drag and text insertion on the same target; starting another movement/interaction on that cursor cancels its current resize. stopResize() restores the exact original inline width and height, while successful completion retains the requested dimensions. Target removal, cursor removal, renderer destruction, and reduced-motion changes release resources and locks. Reduced motion completes the dimensions immediately. No synthetic mouse or pointer events are emitted.
+Each action receives its group/action/cursor identifiers, an AbortSignal, and an abort-aware wait helper. Individual cancellation aborts only that action; dependent actions are cancelled rather than being allowed to run against incomplete prerequisites. Group cancellation and engine destruction propagate abort signals to active callbacks. A failed action cancels its siblings and rejects the group's run promise. Since JavaScript cannot forcibly stop arbitrary callback code, action implementations must cooperate with the supplied signal and return a promise that settles when their work ends.
 
-Handle anchoring is calculated from the element's untransformed CSS border-box dimensions. Top and left handles apply the inverse size delta through the CSS individual translate property, preserving the opposite edge/corner while leaving the transform property unchanged. Existing translate components are composed with the temporary offset; cancellation restores the exact original inline translate, width, and height. The simulation does not provide snapping, min/max constraints, aspect-ratio locking, responsive breakpoint rules, or editor-specific layout semantics. Dimensions are CSS pixels; normal browser layout and CSS constraints may affect the final measured box.
+The action callback is the integration seam for movement, clicking, dragging, text insertion, resizing, cinematic animations, and scroll-driven scenes. For GSAP-backed operations, return or await the timeline so the dependency graph reflects actual animation completion. Void-returning visual effects can use the context wait helper when subsequent actions need to be delayed. No imports from React, CursorRenderer, CinematicAnimationEngine, or ScrollConstructionEngine are required, so these systems remain independently usable and can evolve on separate feature branches.
+
+
+## Advanced visual effects
+
+VisualEffectsManager is an optional DOM adapter exposed by engine.mountVisualEffects(container, options). It owns one absolute-positioned overlay with pointer-events disabled and never adds layout-affecting styles to target elements. It is independent of CursorRenderer and can be mounted alone or alongside cursor rendering.
+
+- highlight() and showSelectionBox() create geometry-aligned boxes and return handles with refresh() and destroy().
+- showGuides() and showSnapGuide() draw vertical/horizontal alignment indicators and return cleanup callbacks.
+- showMeasurement() draws a labelled distance line between container-relative points.
+- showGrid() draws an opt-in CSS grid; setBlueprintMode(true) snapshots element bounds into an overlay.
+- showCursorTrail() draws a pointer-transparent SVG polyline from supplied points.
+- setProgress() and complete() update a visual progress bar.
+- clear() removes active effects while preserving the manager; destroy() removes the overlay and restores the container's original inline position.
+
+All effects are opt-in. Target geometry and blueprint bounds are snapshots; call handle.refresh() after layout changes or recreate blueprint mode. Effects are decorative: guide visuals do not implement snapping, selection does not change application state, and no synthetic pointer or keyboard events are emitted. Reduced-motion preference removes the progress-width transition. CursorBuildEngine tracks effect managers and disposes them on destroy().
