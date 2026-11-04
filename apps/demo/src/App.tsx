@@ -37,7 +37,7 @@ export default function App() {
   timeline.call(() => renderer.moveNaturally("noah", pointAt(0.12, 0.2)));
   timeline.call(() => renderer.moveNaturally("zoe", pointAt(0.78, 0.65)), [], "+=0.4");
   return () => {
-   timeline.kill(); engine.animations.kill("demo-cursor-loop"); engine.coordination.cancelGroup("demo-collaboration"); demoTimelineRef.current = null; renderer.destroy(); rendererRef.current = null;
+   timeline.kill(); engine.animations.kill("demo-cursor-loop"); demoTimelineRef.current = null; renderer.destroy(); rendererRef.current = null;
    starterCursors.forEach((cursor) => engine.cursors.remove(cursor.id));
   };
  }, [engine]);
@@ -63,17 +63,8 @@ export default function App() {
   if (!stage || !renderer) return;
   demoTimelineRef.current?.pause();
   const width = stage.clientWidth, height = stage.clientHeight;
-  engine.coordination.cancelGroup("demo-collaboration");
-  void engine.coordination.runGroup("demo-collaboration", [
-   {
-    id: "maya-drag-card", cursorId: "maya",
-    run: () => renderer.drag("maya", { target: "#drag-card-one", to: { x: Math.max(12, width * 0.56), y: Math.max(12, height * 0.2) }, duration: 1.25, curvature: 0.2 })
-   },
-   {
-    id: "noah-drag-card", cursorId: "noah",
-    run: () => renderer.drag("noah", { target: "#drag-card-two", to: { x: Math.max(12, width * 0.12), y: Math.max(12, height * 0.62) }, duration: 1.45, curvature: 0.16 })
-   }
-  ], { mode: "parallel" }).catch(() => undefined);
+  renderer.drag("maya", { target: "#drag-card-one", to: { x: Math.max(12, width * 0.56), y: Math.max(12, height * 0.2) }, duration: 1.25, curvature: 0.2 });
+  renderer.drag("noah", { target: "#drag-card-two", to: { x: Math.max(12, width * 0.12), y: Math.max(12, height * 0.62) }, duration: 1.45, curvature: 0.16 });
  }
  return <main className="shell">
   <nav><span className="mark">C</span><span>CURSORBUILD</span><span className="nav-tag">MULTI-CURSOR ENGINE · 0.3</span></nav>
@@ -89,7 +80,7 @@ export default function App() {
     <label className="typing-field"><span>PROJECT NOTE</span><input id="typing-input" type="text" defaultValue="Your idea starts here." /></label>
     <div className="stage-card-row drag-card-row"><div id="drag-card-one" className="stage-card drag-card"><span/><strong>Design system</strong><small>Drag me · Maya</small></div><div id="drag-card-two" className="stage-card drag-card"><span/><strong>Live prototype</strong><small>Drag me · Noah</small></div></div>
    </div></div>
-   <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={!cursors.some((cursor) => cursor.id.startsWith("guest-"))}>− Remove cursor</button> <button onClick={replayTextInsertion}>⌨ Replay typing demo</button> <button onClick={replayDrags}>↻ Replay coordinated drag demo</button></div></div>
+   <div className="cursor-controls"><p>CURSOR IDENTITIES · {cursors.length}</p><div><button className="primary" onClick={addCursor}>＋ Add cursor</button> <button onClick={removeCursor} disabled={!cursors.some((cursor) => cursor.id.startsWith("guest-"))}>− Remove cursor</button> <button onClick={replayTextInsertion}>⌨ Replay typing demo</button> <button onClick={replayDrags}>↻ Replay drag demo</button></div></div>
    <div className="cursor-legend">{cursors.map((cursor) => <span className="cursor-chip" key={cursor.id}><i style={{background:cursor.color}}/>{cursor.name}</span>)}</div>
   </section>
   <footer><span>FOUNDATION + MOVEMENT + CLICK + DRAG + TEXT · v0.4.0</span><span>Visual pointers never intercept page interaction.</span></footer>
