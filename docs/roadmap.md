@@ -34,3 +34,21 @@
 - [ ] API reference and integration examples
 - [ ] Accessibility and performance benchmarks
 - [ ] Release automation
+
+
+## Step 9 — Advanced visual effects
+- [x] Optional selection boxes and element highlighting
+- [x] Alignment guides and snap-guide indicators
+- [x] Measurement indicators and grid overlays
+- [x] Blueprint snapshots and cursor trails
+- [x] Construction progress and completion feedback
+- [x] Pointer-transparent overlay and engine lifecycle cleanup
+- [x] Automated tests and API documentation
+
+## Remaining milestones
+- [ ] Step 10 — Responsive and performance optimisation
+- [ ] Step 11 — Reusable component and preset library
+- [ ] Step 12 — Complete documentation and developer experience
+- [ ] Step 13 — Demo website and playground
+- [ ] Step 14 — Examples and integration
+- [ ] Step 15 — Package and release readiness
