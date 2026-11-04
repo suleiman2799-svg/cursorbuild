@@ -274,7 +274,7 @@ const effects = engine.mountVisualEffects(canvas, {
 });
 ~~~
 
-In `auto` mode, touch/coarse-pointer devices, small viewports, or devices reporting four or fewer CPU cores / 4 GB memory use the lighter `performance` profile; other devices use `balanced`. The performance profile uses a coarser default grid, caps trails at 64 points and blueprint snapshots at 80 elements, and disables the progress-width transition. Balanced defaults are 256 trail points and 250 blueprint elements; quality defaults are 1024 and 1000. Explicit limits override profile defaults. Reduced-motion settings continue to take precedence over decorative transitions.
+In `auto` mode, touch/coarse-pointer devices, small viewports, or devices reporting four or fewer CPU cores / 4 GB memory use the lighter `performance` profile; other devices use `balanced`. The auto profile is re-evaluated on viewport resize and coarse-pointer media-query changes, with recalculation coalesced to one animation-frame update; explicitly selected profiles remain fixed. The performance profile uses a coarser default grid, caps trails at 64 points and blueprint snapshots at 80 elements, and disables the progress-width transition. Balanced defaults are 256 trail points and 250 blueprint elements; quality defaults are 1024 and 1000. Explicit limits override profile defaults. Reduced-motion settings continue to take precedence over decorative transitions.
 
 These are adaptive safeguards, not a substitute for profiling every browser/device combination. See the roadmap for remaining manual device profiling and browser-level visual regression work.
 
