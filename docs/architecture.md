@@ -17,7 +17,7 @@ The overlay and all cursor descendants use pointer-events: none. Cursor clicks a
 
 ## Responsive and motion behaviour
 
-Default visible cursor limits are 8 on desktop, 3 on tablet (up to 900px), and 2 on mobile (up to 600px). These limits can be overridden per renderer. A separate `touchMaxVisible` cap (default 2) applies when a coarse pointer or touch input is detected. The renderer recalculates visibility on window resize, orientation changes, visual viewport resize, and pointer-media-query changes. All listeners and media-query subscriptions are removed on destroy. The renderer follows prefers-reduced-motion when enabled: movement becomes immediate and click feedback is suppressed.
+Default visible cursor limits are 8 on desktop, 3 on tablet (up to 900px), and 2 on mobile (up to 600px). These limits can be overridden per renderer. A separate `touchMaxVisible` cap (default 2) applies when a coarse pointer or touch input is detected. The renderer recalculates visibility on window resize, orientation changes, visual viewport resize, and pointer-media-query changes. All listeners and media-query subscriptions are removed on destroy. The renderer follows prefers-reduced-motion when enabled: movement becomes immediate and click feedback is suppressed. Resize/orientation/visual-viewport and coarse-pointer updates are coalesced into one requestAnimationFrame visibility pass, and a pending frame is cancelled on destroy.
 
 ## Natural cursor movement
 
