@@ -78,7 +78,14 @@ export class MultiCursorCoordinator {
       if (mode === "sequence" && previous) dependencies.push(previous);
       const task = Promise.all([...dependencies, startGate]).then(() =>
         this.runAction(groupId, action, groupController.signal)
-      );
+      ).catch((error: unknown) => {
+        // An explicit action cancellation is local. A genuine action failure
+        // still aborts the group so dependent/sibling work cannot continue.
+        if (!(error instanceof Error && error.name === "AbortError") && !groupController.signal.aborted) {
+          this.cancelGroup(groupId);
+        }
+        throw error;
+      });
       tasks.set(action.id, task);
       if (mode === "sequence") previous = task;
       if (delayBetween > 0 && index < ordered.length - 1) {
