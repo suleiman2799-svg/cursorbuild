@@ -172,7 +172,7 @@ describe("ScrollConstructionEngine", () => {
     engine.createScene("hero", { trigger: "#hero" }, () => {});
     expect(() => engine.createScene("hero", { trigger: "#other" }, () => {})).toThrow(/already exists/);
     expect(() => engine.createScene("broken", { trigger: "#broken" }, () => { throw new Error("builder failed"); })).toThrow("builder failed");
-    expect(mocks.timelines[0]!.kill).toHaveBeenCalled();
+    expect(mocks.timelines[1]!.kill).toHaveBeenCalled();
   });
 
   it("destroys every scene and rejects new scenes after engine destruction", () => {
