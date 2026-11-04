@@ -118,6 +118,51 @@ describe("CursorRenderer responsive behaviour", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     renderer.destroy();
   });
+
+  it("applies a separate visible-cursor cap for coarse pointers and reacts to pointer changes", () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
+    let pointerChanged: ((event: MediaQueryListEvent) => void) | undefined;
+    const pointerMedia = {
+      matches: true,
+      addEventListener: vi.fn((_type: string, listener: (event: MediaQueryListEvent) => void) => { pointerChanged = listener; }),
+      removeEventListener: vi.fn()
+    };
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = vi.fn((query: string) => query === "(pointer: coarse)"
+      ? pointerMedia
+      : { matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }) as unknown as typeof window.matchMedia;
+
+    const { manager, host, renderer } = setup([]);
+    for (let index = 0; index < 4; index++) manager.add({ id: String(index), name: "Touch " + index, color: "#abc" });
+    const nodes = Array.from(host.querySelectorAll<HTMLElement>(".cursorbuild-cursor"));
+    expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(2);
+
+    pointerMedia.matches = false;
+    pointerChanged?.({ matches: false } as MediaQueryListEvent);
+    expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(4);
+    renderer.destroy();
+    expect(pointerMedia.removeEventListener).toHaveBeenCalledWith("change", expect.any(Function));
+
+    window.matchMedia = originalMatchMedia;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+  });
+
+  it("recalculates visibility after orientation changes and validates touch limits", () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1200 });
+    const { manager, host, renderer } = setup([]);
+    for (let index = 0; index < 4; index++) manager.add({ id: String(index), name: "Designer " + index, color: "#abc" });
+    const nodes = Array.from(host.querySelectorAll<HTMLElement>(".cursorbuild-cursor"));
+    expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(4);
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 500 });
+    window.dispatchEvent(new Event("orientationchange"));
+    expect(nodes.filter((node) => node.style.display === "flex")).toHaveLength(2);
+    renderer.destroy();
+    expect(() => setup(["invalid"], { touchMaxVisible: -1 })).toThrow(RangeError);
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+  });
 });
 
 describe("CursorRenderer drag simulation", () => {
