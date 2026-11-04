@@ -53,10 +53,12 @@ describe("VisualEffectsManager", () => {
   });
   it("bounds trail and blueprint rendering in the performance profile", () => {
     container = document.createElement("div");
+    let geometryReads = 0;
     for (let index = 0; index < 5; index += 1) {
       const item = document.createElement("div");
       item.textContent = "item " + index;
       item.getBoundingClientRect = () => {
+        geometryReads += 1;
         expect(manager!.overlay.querySelector(".cursorbuild-effect-blueprint")).toBeNull();
         return {
           left: index * 10, top: 0, right: index * 10 + 8, bottom: 8,
@@ -80,6 +82,7 @@ describe("VisualEffectsManager", () => {
 
     const blueprint = manager.setBlueprintMode(true)!;
     expect(blueprint.element.childElementCount).toBe(2);
+    expect(geometryReads).toBe(2);
     expect(manager.showGrid().element.style.backgroundSize).toBe("40px 40px");
     manager.setProgress(0.5);
     expect((manager.overlay.querySelector(".cursorbuild-effect-progress__fill") as HTMLElement).style.transition).toBe("none");
