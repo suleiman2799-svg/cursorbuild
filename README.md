@@ -278,6 +278,20 @@ In `auto` mode, touch/coarse-pointer devices, small viewports, or devices report
 
 These are adaptive safeguards, not a substitute for profiling every browser/device combination. See the roadmap for remaining manual device profiling and browser-level visual regression work.
 
+### Manual device verification
+
+Before release, verify the following in real browsers (including at least one physical touch device):
+
+- **Desktop + mouse:** use a wide viewport and confirm the configured desktop cursor cap.
+- **Tablet + touch:** use a coarse-pointer device or browser device emulation and confirm `touchMaxVisible` applies independently of viewport width.
+- **Phone + orientation:** test a narrow portrait viewport, rotate to landscape, and confirm visibility updates after the orientation change.
+- **Viewport changes:** resize the browser and, where available, test the visual viewport while browser chrome or the on-screen keyboard changes the visible area.
+- **Reduced motion:** enable the operating-system reduced-motion preference and confirm cursor movement/click effects and progress transitions follow the configured policy.
+- **Performance profile:** render long trails and a page with many elements using `performanceMode: "performance"`; confirm the SVG trail and blueprint outline counts remain within configured limits.
+- **Lifecycle:** repeatedly mount and destroy renderers/effect managers; confirm overlays disappear and no stale cursor nodes or resize/pointer listeners remain.
+
+Automated tests cover the responsive caps, orientation event, frame coalescing, effect limits, and cleanup hooks. Physical-device profiling and browser-level visual regression have not yet been performed.
+
 ## Optional React integration
 
 The React workspace exports `CursorBuildProvider`, `useCursorBuild()`, and `useCursors()`:
