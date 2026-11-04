@@ -46,7 +46,7 @@
 - [x] Automated tests and API documentation
 
 ## Remaining milestones
-- [ ] Step 10 — Responsive and performance optimisation
+- [x] Step 10 — Responsive and performance optimisation (implementation; physical-device profiling remains)
 - [ ] Step 11 — Reusable component and preset library
 - [ ] Step 12 — Complete documentation and developer experience
 - [ ] Step 13 — Demo website and playground
