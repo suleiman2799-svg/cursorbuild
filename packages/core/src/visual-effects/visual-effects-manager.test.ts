@@ -102,6 +102,10 @@ describe("VisualEffectsManager", () => {
     const originalWidth = Object.getOwnPropertyDescriptor(window, "innerWidth");
     const originalRaf = Object.getOwnPropertyDescriptor(window, "requestAnimationFrame");
     const originalCancel = Object.getOwnPropertyDescriptor(window, "cancelAnimationFrame");
+    const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
+    const originalTouchPoints = Object.getOwnPropertyDescriptor(navigator, "maxTouchPoints");
+    const originalHardwareConcurrency = Object.getOwnPropertyDescriptor(navigator, "hardwareConcurrency");
+    const originalDeviceMemory = Object.getOwnPropertyDescriptor(navigator, "deviceMemory");
     let scheduled: FrameRequestCallback | undefined;
     let nextFrame = 0;
     const requestFrame = vi.fn((callback: FrameRequestCallback) => {
@@ -112,6 +116,13 @@ describe("VisualEffectsManager", () => {
     const cancelFrame = vi.fn();
     Object.defineProperty(window, "requestAnimationFrame", { configurable: true, value: requestFrame });
     Object.defineProperty(window, "cancelAnimationFrame", { configurable: true, value: cancelFrame });
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })
+    });
+    Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 0 });
+    Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, value: 8 });
+    Object.defineProperty(navigator, "deviceMemory", { configurable: true, value: 8 });
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
     try {
       container = document.createElement("div");
@@ -144,6 +155,14 @@ describe("VisualEffectsManager", () => {
       else Reflect.deleteProperty(window, "requestAnimationFrame");
       if (originalCancel) Object.defineProperty(window, "cancelAnimationFrame", originalCancel);
       else Reflect.deleteProperty(window, "cancelAnimationFrame");
+      if (originalMatchMedia) Object.defineProperty(window, "matchMedia", originalMatchMedia);
+      else Reflect.deleteProperty(window, "matchMedia");
+      if (originalTouchPoints) Object.defineProperty(navigator, "maxTouchPoints", originalTouchPoints);
+      else Reflect.deleteProperty(navigator, "maxTouchPoints");
+      if (originalHardwareConcurrency) Object.defineProperty(navigator, "hardwareConcurrency", originalHardwareConcurrency);
+      else Reflect.deleteProperty(navigator, "hardwareConcurrency");
+      if (originalDeviceMemory) Object.defineProperty(navigator, "deviceMemory", originalDeviceMemory);
+      else Reflect.deleteProperty(navigator, "deviceMemory");
     }
   });
 
