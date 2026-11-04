@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CursorBuildEngine } from "./engine.js";
 import { CinematicAnimationEngine } from "./animation/cinematic-animation-engine.js";
 import { MultiCursorCoordinationEngine } from "./coordination/multi-cursor-coordination-engine.js";
@@ -7,6 +7,25 @@ import { MultiCursorCoordinator } from "./coordination/multi-cursor-coordinator.
 import { ScrollConstructionEngine } from "./scroll/scroll-construction-engine.js";
 
 describe("CursorBuildEngine feature integration", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    window.matchMedia = vi.fn((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => true)
+    })) as unknown as typeof window.matchMedia;
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+  });
+
   it("constructs the reconciled animation, scroll, and coordination subsystems together", () => {
     const engine = new CursorBuildEngine();
 
