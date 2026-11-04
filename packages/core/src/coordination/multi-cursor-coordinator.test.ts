@@ -131,14 +131,27 @@ describe("MultiCursorCoordinator", () => {
     expect(prior).toHaveBeenCalledOnce();
   });
 
-  it("cancels an individual action and kills its active GSAP animation", async () => {
+  it("cancels one action without aborting unrelated sibling actions", async () => {
     const coordinator = setup();
-    const { animation } = createAnimation();
-    const done = coordinator.runGroup("cancel-one", [{ id: "drag", cursorId: "maya", run: () => animation as never }]);
+    const cancelled = createAnimation();
+    const sibling = createAnimation();
+    const done = coordinator.runGroup("cancel-one", [
+      { id: "drag", cursorId: "maya", run: () => cancelled.animation as never },
+      { id: "type", cursorId: "noah", run: () => sibling.animation as never }
+    ]);
     await flushActionScheduling();
+    expect(coordinator.getActiveActionIds()).toEqual(["drag", "type"]);
     expect(coordinator.cancelAction("drag")).toBe(true);
+    await flushActionScheduling();
+    expect(cancelled.animation.kill).toHaveBeenCalledOnce();
+    expect(sibling.animation.kill).not.toHaveBeenCalled();
+    expect(coordinator.getActiveActionIds()).toEqual(["type"]);
+    expect(coordinator.getActiveGroupIds()).toEqual(["cancel-one"]);
+
+    sibling.complete();
     await expect(done).rejects.toMatchObject({ name: "AbortError" });
-    expect(animation.kill).toHaveBeenCalledOnce();
+    expect(sibling.animation.kill).not.toHaveBeenCalled();
+    expect(coordinator.getActiveGroupIds()).toEqual([]);
     expect(coordinator.cancelAction("drag")).toBe(false);
   });
 
