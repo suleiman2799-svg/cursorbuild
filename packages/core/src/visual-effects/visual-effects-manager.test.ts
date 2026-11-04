@@ -98,6 +98,55 @@ describe("VisualEffectsManager", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
   });
 
+  it("reselects auto performance profiles across desktop and mobile viewport changes without repeated frame work", () => {
+    const originalWidth = Object.getOwnPropertyDescriptor(window, "innerWidth");
+    const originalRaf = Object.getOwnPropertyDescriptor(window, "requestAnimationFrame");
+    const originalCancel = Object.getOwnPropertyDescriptor(window, "cancelAnimationFrame");
+    let scheduled: FrameRequestCallback | undefined;
+    let nextFrame = 0;
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      scheduled = callback;
+      nextFrame += 1;
+      return nextFrame;
+    });
+    const cancelFrame = vi.fn();
+    Object.defineProperty(window, "requestAnimationFrame", { configurable: true, value: requestFrame });
+    Object.defineProperty(window, "cancelAnimationFrame", { configurable: true, value: cancelFrame });
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+    try {
+      container = document.createElement("div");
+      document.body.appendChild(container);
+      manager = new VisualEffectsManager(container);
+      expect(manager.showGrid().element.style.backgroundSize).toBe("24px 24px");
+
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+      window.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new Event("resize"));
+      expect(requestFrame).toHaveBeenCalledOnce();
+      scheduled?.(0);
+      expect(manager.showGrid().element.style.backgroundSize).toBe("40px 40px");
+
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+      window.dispatchEvent(new Event("resize"));
+      scheduled?.(16);
+      expect(manager.showGrid().element.style.backgroundSize).toBe("24px 24px");
+
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+      window.dispatchEvent(new Event("resize"));
+      manager.destroy();
+      expect(cancelFrame).toHaveBeenCalledWith(3);
+      window.dispatchEvent(new Event("resize"));
+      expect(requestFrame).toHaveBeenCalledTimes(3);
+    } finally {
+      if (originalWidth) Object.defineProperty(window, "innerWidth", originalWidth);
+      else Reflect.deleteProperty(window, "innerWidth");
+      if (originalRaf) Object.defineProperty(window, "requestAnimationFrame", originalRaf);
+      else Reflect.deleteProperty(window, "requestAnimationFrame");
+      if (originalCancel) Object.defineProperty(window, "cancelAnimationFrame", originalCancel);
+      else Reflect.deleteProperty(window, "cancelAnimationFrame");
+    }
+  });
+
   it("clear removes every active effect, including transient guides, measurements, and trails", () => {
     setup();
     const highlight = manager!.highlight("#card");
