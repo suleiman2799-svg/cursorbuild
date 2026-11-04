@@ -603,7 +603,7 @@ export class CursorRenderer {
     };
     const originX = originFraction(originParts[0], startBoxWidth);
     const originY = originFraction(originParts[1], startBoxHeight);
-    const setAnchorOffset = (width: number, height: number) => {
+    const getAnchorTranslate = (width: number, height: number): string => {
       const deltaWidth = width - startBoxWidth;
       const deltaHeight = height - startBoxHeight;
       const anchorX = handle.includes("left") ? deltaWidth : 0;
@@ -616,15 +616,14 @@ export class CursorRenderer {
       const transformedOriginY = -mb * originDeltaX + (1 - md) * originDeltaY;
       const dx = -(transformedAnchorX + transformedOriginX);
       const dy = -(transformedAnchorY + transformedOriginY);
-      element.style.translate = Math.abs(dx) < 1e-8 && Math.abs(dy) < 1e-8
+      return Math.abs(dx) < 1e-8 && Math.abs(dy) < 1e-8
         ? originalTranslate
         : composeTranslate(dx, dy);
     };
-    const targetOffsetX = handle.includes("left") ? startBoxWidth - targetBoxWidth : 0;
-    const targetOffsetY = handle.includes("top") ? startBoxHeight - targetBoxHeight : 0;
-    const cssTargetTranslate = targetOffsetX === 0 && targetOffsetY === 0
-      ? originalTranslate
-      : composeTranslate(targetOffsetX, targetOffsetY);
+    const setAnchorOffset = (width: number, height: number) => {
+      element.style.translate = getAnchorTranslate(width, height);
+    };
+    const cssTargetTranslate = getAnchorTranslate(targetBoxWidth, targetBoxHeight);
     const frame = document.createElement("div");
     frame.className = "cursorbuild-resize-frame"; frame.setAttribute("aria-hidden","true");
     RESIZE_HANDLES.forEach((name)=>{
