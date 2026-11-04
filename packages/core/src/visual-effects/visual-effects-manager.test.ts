@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { VisualEffectsManager } from "./visual-effects-manager.js";
 
 describe("VisualEffectsManager", () => {
