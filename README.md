@@ -374,11 +374,10 @@ GitHub Actions runs tests, type checks, and builds for pushes to development bra
 | Foundation, engine lifecycle, configuration, cursor registry, animation/scroll managers, action sequencing, React integration, demo and baseline tests | Complete |
 | Cursor rendering, natural movement, click feedback, responsive visibility and reduced-motion handling | Implemented |
 | Drag/drop, text insertion, and element resizing simulations | Implemented |
-| Cinematic animation engine | Implemented |
-| Scroll-driven construction scenes | Implemented |
+| Step 6 — cinematic animation engine | Implemented |
+| Step 7 — scroll-driven construction scenes | Implemented |
 | Step 8 — multi-cursor coordination engine | Implemented |
 | Step 9 — advanced visual effects | Implemented |
-| Responsive and performance optimisation (Step 10) | Planned |
 | Step 10 — responsive and performance optimisation | Planned |
 | Step 11 — reusable component and preset library | Planned |
 | Step 12 — complete documentation and developer experience | Planned |
