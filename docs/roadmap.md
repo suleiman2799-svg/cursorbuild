@@ -1,6 +1,6 @@
 # Development roadmap
 
-This roadmap distinguishes what is present on `main`, what has been implemented on an open feature branch, and what remains future work. An open PR is not considered merged into `main`.
+This roadmap records the implementation status on `main` and the remaining future work. Open or unmerged pull requests are not counted as completed.
 
 ## Foundation and core runtime — implemented on main
 - [x] TypeScript core package and public exports
@@ -41,7 +41,7 @@ This roadmap distinguishes what is present on `main`, what has been implemented 
 ## Step 5B — Element resizing
 - [x] Implemented and merged into main
 
-## Step 10 — Responsive and performance optimisation — implemented on this branch
+## Step 10 — Responsive and performance optimisation — implemented and merged into main
 - [x] Desktop, tablet, and mobile cursor visibility limits
 - [x] Additional coarse-pointer/touch visibility cap
 - [x] Visibility updates on window resize, orientation changes, visual viewport resize, and pointer media-query changes
@@ -62,4 +62,4 @@ This roadmap distinguishes what is present on `main`, what has been implemented 
 
 ## Release constraint
 
-No npm package has been published. Package publication and public release remain gated on explicit approval after the release-readiness milestone.
+No npm package has been published. Publication remains gated on passing release checks, a configured `NPM_TOKEN` repository secret, and an explicit manual workflow dispatch confirmation.

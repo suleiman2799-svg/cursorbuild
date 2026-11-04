@@ -345,8 +345,8 @@ GitHub Actions runs tests, type checks, and builds for pushes to development bra
 | Step 6 — cinematic animation engine | Implemented |
 | Step 7 — scroll-driven construction engine | Implemented |
 | Step 9 — advanced visual effects | Implemented |
-| Step 10 — responsive and performance optimisation | Implemented on this branch |
-| Element resizing and positioning | Planned |
+| Step 10 — responsive and performance optimisation | Implemented and merged into main |
+| Element resizing and positioning (Step 5B) | Implemented and merged into main |
 
 | Step 11 — reusable component and preset library | Planned |
 | Step 12 — complete documentation and developer experience | Planned |
