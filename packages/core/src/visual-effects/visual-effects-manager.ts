@@ -23,10 +23,16 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 export class VisualEffectsManager {
   readonly overlay: HTMLDivElement;
   private readonly zIndex: number;
-  private readonly gridSize: number;
-  private readonly performanceMode: Exclude<VisualEffectsPerformanceMode, "auto">;
-  private readonly maxTrailPoints: number;
-  private readonly maxBlueprintElements: number;
+  private performanceMode: Exclude<VisualEffectsPerformanceMode, "auto">;
+  private gridSize: number;
+  private maxTrailPoints: number;
+  private maxBlueprintElements: number;
+  private readonly requestedMode: VisualEffectsPerformanceMode;
+  private readonly configuredGridSize?: number;
+  private readonly configuredMaxTrailPoints?: number;
+  private readonly configuredMaxBlueprintElements?: number;
+  private readonly coarsePointerQuery?: MediaQueryList;
+  private viewportFrame?: number;
   private readonly reducedMotion: boolean;
   private readonly originalPosition: string;
   private readonly changedPosition: boolean;
@@ -38,19 +44,18 @@ export class VisualEffectsManager {
   constructor(private readonly container: HTMLElement, options: VisualEffectsOptions = {}) {
     if (typeof window === "undefined" || typeof document === "undefined") throw new Error("VisualEffectsManager requires a browser DOM.");
     this.zIndex = options.zIndex ?? 40;
-    const requestedMode = options.performanceMode ?? "auto";
-    if (!["auto", "quality", "balanced", "performance"].includes(requestedMode)) throw new TypeError("Unknown visual-effects performance mode.");
-    const touchDevice = (typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches)
-      || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
-    const hardware = typeof navigator === "undefined" ? undefined : navigator as Navigator & { deviceMemory?: number };
-    const constrainedHardware = !!hardware && ((hardware.hardwareConcurrency > 0 && hardware.hardwareConcurrency <= 4)
-      || (typeof hardware.deviceMemory === "number" && hardware.deviceMemory <= 4));
-    this.performanceMode = requestedMode === "auto"
-      ? (touchDevice || constrainedHardware || window.innerWidth <= 600 ? "performance" : "balanced")
-      : requestedMode;
-    this.gridSize = options.gridSize ?? (this.performanceMode === "performance" ? 40 : 24);
-    this.maxTrailPoints = options.maxTrailPoints ?? (this.performanceMode === "quality" ? 1024 : this.performanceMode === "performance" ? 64 : 256);
-    this.maxBlueprintElements = options.maxBlueprintElements ?? (this.performanceMode === "quality" ? 1000 : this.performanceMode === "performance" ? 80 : 250);
+    this.requestedMode = options.performanceMode ?? "auto";
+    if (!["auto", "quality", "balanced", "performance"].includes(this.requestedMode)) throw new TypeError("Unknown visual-effects performance mode.");
+    this.configuredGridSize = options.gridSize;
+    this.configuredMaxTrailPoints = options.maxTrailPoints;
+    this.configuredMaxBlueprintElements = options.maxBlueprintElements;
+    this.coarsePointerQuery = typeof window.matchMedia === "function"
+      ? window.matchMedia("(pointer: coarse)")
+      : undefined;
+    this.performanceMode = this.resolvePerformanceMode();
+    this.gridSize = this.configuredGridSize ?? (this.performanceMode === "performance" ? 40 : 24);
+    this.maxTrailPoints = this.configuredMaxTrailPoints ?? (this.performanceMode === "quality" ? 1024 : this.performanceMode === "performance" ? 64 : 256);
+    this.maxBlueprintElements = this.configuredMaxBlueprintElements ?? (this.performanceMode === "quality" ? 1000 : this.performanceMode === "performance" ? 80 : 250);
     if (!Number.isInteger(this.zIndex)) throw new RangeError("zIndex must be an integer.");
     if (!Number.isFinite(this.gridSize) || this.gridSize <= 0) throw new RangeError("gridSize must be finite and greater than zero.");
     if (!Number.isInteger(this.maxTrailPoints) || this.maxTrailPoints < 2) throw new RangeError("maxTrailPoints must be an integer of at least 2.");
@@ -64,6 +69,10 @@ export class VisualEffectsManager {
     this.overlay.setAttribute("aria-hidden", "true");
     Object.assign(this.overlay.style, { position: "absolute", inset: "0", width: "100%", height: "100%", overflow: "visible", pointerEvents: "none", zIndex: String(this.zIndex), contain: "layout style", isolation: "isolate" });
     container.appendChild(this.overlay);
+    if (this.requestedMode === "auto") {
+      window.addEventListener("resize", this.handleViewportChange, { passive: true });
+      this.coarsePointerQuery?.addEventListener?.("change", this.handleViewportChange);
+    }
   }
   highlight(target: VisualEffectTarget, options: HighlightOptions = {}): VisualEffectHandle {
     this.assertActive(); const element = this.resolveTarget(target); const color = options.color ?? "#8b5cf6";
@@ -170,7 +179,48 @@ export class VisualEffectsManager {
     this.overlay.replaceChildren();
     this.progress = undefined;
   }
-  destroy(): void { if (this.destroyed) return; this.clear(); this.overlay.remove(); if (this.changedPosition) this.container.style.position = this.originalPosition; this.destroyed = true; }
+  destroy(): void {
+    if (this.destroyed) return;
+    this.clear();
+    window.removeEventListener("resize", this.handleViewportChange);
+    this.coarsePointerQuery?.removeEventListener?.("change", this.handleViewportChange);
+    if (this.viewportFrame !== undefined && typeof window.cancelAnimationFrame === "function") {
+      window.cancelAnimationFrame(this.viewportFrame);
+      this.viewportFrame = undefined;
+    }
+    this.overlay.remove();
+    if (this.changedPosition) this.container.style.position = this.originalPosition;
+    this.destroyed = true;
+  }
+  private resolvePerformanceMode(): Exclude<VisualEffectsPerformanceMode, "auto"> {
+    if (this.requestedMode !== "auto") return this.requestedMode;
+    const touchDevice = !!this.coarsePointerQuery?.matches
+      || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0);
+    const hardware = typeof navigator === "undefined" ? undefined : navigator as Navigator & { deviceMemory?: number };
+    const constrainedHardware = !!hardware && (
+      (hardware.hardwareConcurrency > 0 && hardware.hardwareConcurrency <= 4)
+      || (typeof hardware.deviceMemory === "number" && hardware.deviceMemory <= 4)
+    );
+    return touchDevice || constrainedHardware || window.innerWidth <= 600 ? "performance" : "balanced";
+  }
+  private readonly handleViewportChange = (): void => {
+    if (this.destroyed || this.requestedMode !== "auto" || this.viewportFrame !== undefined) return;
+    const update = (): void => {
+      this.viewportFrame = undefined;
+      if (this.destroyed) return;
+      const nextMode = this.resolvePerformanceMode();
+      if (nextMode === this.performanceMode) return;
+      this.performanceMode = nextMode;
+      if (this.configuredGridSize === undefined) this.gridSize = nextMode === "performance" ? 40 : 24;
+      if (this.configuredMaxTrailPoints === undefined) this.maxTrailPoints = nextMode === "quality" ? 1024 : nextMode === "performance" ? 64 : 256;
+      if (this.configuredMaxBlueprintElements === undefined) this.maxBlueprintElements = nextMode === "quality" ? 1000 : nextMode === "performance" ? 80 : 250;
+    };
+    if (typeof window.requestAnimationFrame === "function") {
+      this.viewportFrame = window.requestAnimationFrame(update);
+    } else {
+      update();
+    }
+  };
   private registerTransient<T extends HTMLElement | SVGSVGElement>(element: T): () => void {
     let active = true;
     const cleanup = (): void => {
