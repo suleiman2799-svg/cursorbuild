@@ -543,6 +543,36 @@ describe("CursorRenderer element resizing simulation", () => {
     });
   });
 
+  it("keeps the opposite anchor fixed for a rotated and scaled target", () => {
+    const { host, renderer } = setup(["a"]);
+    const target = addResizeTarget(host);
+    target.style.width = "100px";
+    target.style.height = "80px";
+    target.style.translate = "12px 4px";
+    target.style.transform = "matrix(0, 1, -1, 0, 0, 0)";
+    target.style.transformOrigin = "50% 50%";
+    const rect = () => ({
+      x: 10, y: 20, left: 10, top: 20, right: 110, bottom: 100,
+      width: 100, height: 80, toJSON: () => ({})
+    } as DOMRect);
+    vi.spyOn(target, "getBoundingClientRect").mockImplementation(rect);
+
+    renderer.resize("a", { target, to: { width: 140, height: 100 }, handle: "top-left" });
+    const tween = gsapState.timelines[gsapState.timelines.length - 1].to.mock.calls[1];
+    const progress = tween[0] as { value: number };
+    const onUpdate = tween[1].onUpdate as () => void;
+    progress.value = 1;
+    onUpdate();
+
+    // R90 with a centered transform origin maps the 40x20 anchor delta
+    // to a net screen displacement of (10, 30); the counter-translation
+    // must therefore be (-10, -30), in addition to the original translate.
+    expect(target.style.translate).toBe("calc(12px + -10px) calc(4px + -30px)");
+    renderer.stopResize("a");
+    expect(target.style.translate).toBe("12px 4px");
+    expect(target.style.transform).toBe("matrix(0, 1, -1, 0, 0, 0)");
+  });
+
   it("rejects invalid dimensions, selectors, durations, and curvature", () => {
     const { host, renderer } = setup(["a"]);
     addResizeTarget(host);
