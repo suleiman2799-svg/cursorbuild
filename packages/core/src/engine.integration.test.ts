@@ -58,7 +58,7 @@ describe("CursorBuildEngine feature integration", () => {
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
     window.dispatchEvent(new Event("resize"));
     await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
-    expect([...host.querySelectorAll<HTMLElement>(".cursorbuild-cursor")].filter((node) => node.style.display === "flex")).toHaveLength(2);
+    expect(Array.from(host.querySelectorAll<HTMLElement>(".cursorbuild-cursor")).filter((node) => node.style.display === "flex")).toHaveLength(2);
     renderer.resize("four", { target, to: { width: 180, height: 90 }, duration: 0 });
     expect(target.style.width).toBe("180px");
     expect(target.style.height).toBe("90px");
