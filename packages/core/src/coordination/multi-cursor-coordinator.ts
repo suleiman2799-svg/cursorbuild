@@ -71,6 +71,8 @@ export class MultiCursorCoordinator {
     const tasks = new Map<string, Promise<void>>();
     let startGate: Promise<void> = Promise.resolve();
     let previous: Promise<void> | undefined;
+    let hasFailure = false;
+    let firstFailure: unknown;
 
     for (let index = 0; index < ordered.length; index += 1) {
       const action = ordered[index]!;
@@ -82,6 +84,7 @@ export class MultiCursorCoordinator {
         // An explicit action cancellation is local. A genuine action failure
         // still aborts the group so dependent/sibling work cannot continue.
         if (!(error instanceof Error && error.name === "AbortError") && !groupController.signal.aborted) {
+          if (!hasFailure) { hasFailure = true; firstFailure = error; }
           this.cancelGroup(groupId);
         }
         throw error;
@@ -96,6 +99,7 @@ export class MultiCursorCoordinator {
 
     try {
       const settled = await Promise.allSettled(tasks.values());
+      if (hasFailure) throw firstFailure;
       const rejected = settled.find((result): result is PromiseRejectedResult => result.status === "rejected");
       if (rejected) throw rejected.reason;
     } finally {
